@@ -268,14 +268,29 @@ def main():
     ae_passed, ae_details = check_account_equation(acc)
     tx_passed, tx_details = check_tx_history_fresh(RGL_HTML)
     
-    # v6.0: Supreme Executor 越权模式 - 允许跳过安全检查，但必须记录完整的合规审计痕迹
+    # 核心对账硬门槛：持仓对账一致 (sa_passed)、挂单无残留 (un_passed)、会计恒等式成立 (ae_passed)
+    # 任何情况下均不得绕过这三项核心安全审计（严禁 SEDG 事故重演）
+    core_reconciled = bool(sa_passed and un_passed and ae_passed)
+    checks_passed = bool(core_reconciled and tx_passed)
+
+    # 越权模式治理：纯环境变量禁止绕过核心对账。仅在核心对账 100% 通过、且仅因券商流水历史延迟 (tx_passed 为假) 时，
+    # 经由显式非默认原因及完整审计记录，方可免除流水非致命告警开闸。
     OVERRIDE_MODE = os.environ.get('SMG_OVERRIDE_MODE', '').upper() == 'SUPREME_EXECUTOR'
-    override_reason = os.environ.get('SMG_OVERRIDE_REASON', 'EMERGENCY_MANUAL_OVERRIDE')
-    checks_passed = bool(sa_passed and un_passed and ae_passed and tx_passed)
-    
+    override_reason = os.environ.get('SMG_OVERRIDE_REASON', '').strip()
+
+    override_active = False
     if OVERRIDE_MODE:
-        gate_open = True
-        print(f'🚨 [AUDIT_WARNING] SUPREME_EXECUTOR 越权模式激活: 强制 gate_open=True (原始安全检查结果: {checks_passed}, 理由: {override_reason})')
+        if not core_reconciled:
+            gate_open = False
+            print(f'🛑 [GOVERNANCE_BLOCKED] 核心对账失败 (sa={sa_passed}, un={un_passed}, ae={ae_passed})！'
+                  f'越权通道严格禁止跨越核心对账红线，开闸请求被硬性否决！')
+        elif not override_reason or override_reason == 'EMERGENCY_MANUAL_OVERRIDE' or len(override_reason) < 10:
+            gate_open = False
+            print(f'🛑 [GOVERNANCE_BLOCKED] 越权申请理由无效或使用默认占位符，开闸被否决。必须提供具体真实的审计理由。')
+        else:
+            override_active = True
+            gate_open = True
+            print(f'⚠️ [AUDIT_OVERRIDE] 核心对账通过但流水延迟，经合规越权放行: gate_open=True (理由: {override_reason})')
     else:
         gate_open = checks_passed
     

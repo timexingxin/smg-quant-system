@@ -41,4 +41,4 @@ TRADING_DAYS_YEAR: int = 252            # 年交易日标准基数
 # 6. 盘中高频守护与限流参数 (Patrol & Rate Limiting)
 MOMENTUM_START_TIME: str = "07:15"      # 避开早盘假突破的时间锁 (美西 07:15 PT)
 MAX_DAILY_BUYS: int = 2                 # 单交易日最大开仓次数熔断锁
-CACHE_TTL_SECONDS: int = 30             # 本地行情接口缓存时长（防止高频封禁）\n
+CACHE_TTL_SECONDS: int = 30             # 本地行情接口缓存时长（防止高频封禁）

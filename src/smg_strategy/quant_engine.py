@@ -12,7 +12,7 @@ SMG V3.0 激进冲刺量化验证引擎 — Chief Quant Analyst
 import numpy as np
 from scipy import stats, optimize
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional
 import json, sys, warnings, time
 warnings.filterwarnings('ignore')
 
@@ -165,7 +165,8 @@ def dcf_intrinsic_value(ticker: str, market_price: float, info: Optional[Dict] =
         else:
             wacc = cost_of_equity
 
-        wacc = max(0.06, min(wacc, 0.15))
+        # 动态 WACC 允许根据高贝塔风险适度上浮至 20%，避免对高成长/高波动标的机械钳制为 15% 常数天花板
+        wacc = max(0.06, min(wacc, 0.20))
 
         # 动态增长率提取（去除手写死字典，优先拉取财报预期） (P2-7)
         raw_growth = info.get('earningsGrowth') or info.get('revenueGrowth')
@@ -190,10 +191,23 @@ def dcf_intrinsic_value(ticker: str, market_price: float, info: Optional[Dict] =
         terminal_value = terminal_fcf / (wacc - terminal_g)
         pv_terminal = terminal_value / ((1 + wacc) ** growth_years)
 
-        fair_value = pv + pv_terminal
-        mos = (fair_value - market_price) / fair_value if fair_value > 0 else 0
+        fair_value = max(0.0, pv + pv_terminal)
 
-        if mos > 0.25:
+        # 安全边际计算与下界截断 (P2-3.3: 解决负值无下界失真问题，避免出现 -3700% 等失真数值)
+        if fair_value > 0 and market_price > 0:
+            raw_mos = (fair_value - market_price) / market_price
+            mos = max(-1.0, min(1.0, raw_mos))
+        else:
+            raw_mos = -1.0
+            mos = -1.0
+
+        # DCF 模型适用性检验 (针对 FCF/市值 极低或高估值成长股打上标记)
+        fcf_yield = (fcf / market_cap) if (market_cap and market_cap > 0 and fcf is not None) else 0.0
+        is_applicable = bool(fcf_yield > 0.005 and fair_value >= 0.10 * market_price)
+
+        if not is_applicable:
+            rec = "NOT_APPLICABLE"
+        elif mos > 0.25:
             rec = "STRONG_UNDER"
         elif mos > 0.10:
             rec = "UNDER"
@@ -209,6 +223,9 @@ def dcf_intrinsic_value(ticker: str, market_price: float, info: Optional[Dict] =
             "market_price": market_price,
             "fair_value": round(fair_value, 2),
             "mos": round(mos, 4),
+            "raw_mos": round(raw_mos, 4),
+            "is_applicable": is_applicable,
+            "fcf_yield": round(fcf_yield, 4),
             "wacc": round(wacc, 4),
             "cost_of_equity": round(cost_of_equity, 4),
             "growth_s1": round(g1, 4),
@@ -257,10 +274,15 @@ def run_monte_carlo(ticker: str, score: int, entry_price: float,
     if horizon_days is None:
         horizon_days = REMAINING_DAYS
 
-    mu_d = market_params.get("mu_daily", 0.0003)
-    sigma_d = market_params.get("sigma_daily", 0.018)
-    if sigma_d <= 0:
-        sigma_d = 0.018
+    mu_d = market_params.get("mu_daily", market_params.get("daily_drift", 0.0003))
+    sigma_d = market_params.get("sigma_daily", None)
+    if sigma_d is None or sigma_d <= 0:
+        if "daily_vol" in market_params and market_params["daily_vol"] > 0:
+            sigma_d = market_params["daily_vol"]
+        elif "annual_vol" in market_params and market_params["annual_vol"] > 0:
+            sigma_d = market_params["annual_vol"] / np.sqrt(252)
+        else:
+            sigma_d = 0.018
 
     # BGK 位移修正: 连续首达时边界在离散监控下的有效等价边界
     # beta_bgk = -zeta(1/2) / sqrt(2*pi) ~= 0.5826
@@ -879,13 +901,15 @@ def main():
         reasons = []
         if score >= MIN_BUY_SCORE:
             votes += 1
-            reasons.append("V2.0≥60")
+            reasons.append(f"V2.0≥{int(MIN_BUY_SCORE)}")
         if ev > 0.015 and p_stop < 0.50:
             votes += 1
             reasons.append("MC+EV")
-        if mos is not None and mos > 0.05:
+        if dcf.get("is_applicable", True) and mos is not None and mos > 0.05:
             votes += 1
             reasons.append("DCF")
+        elif not dcf.get("is_applicable", True):
+            reasons.append("DCF_N/A")
         if tech_s >= 60:
             votes += 1
             reasons.append(f"Tech{tech_s}")

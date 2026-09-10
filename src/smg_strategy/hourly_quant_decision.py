@@ -364,10 +364,10 @@ def generate_decision(positions, mc_results, dcf_results, corr, account, scanner
 
     # --- PART D: V2.0 Scanner ---
     print("\n" + "─" * 72)
-    print("  PART D: V2.0 Scanner 买入信号检查 (>=80分买入)")
+    print(f"  PART D: V2.0 Scanner 买入信号检查 (>={MIN_BUY_SCORE:.0f}分买入)")
     print("─" * 72)
     max_score = max(scanner.values())
-    print(f"  最高得分: {max_score} 分 -> {'❌ 无合格标的 (所有 < 80)' if max_score < MIN_BUY_SCORE else '✅ 有买入信号'}")
+    print(f"  最高得分: {max_score} 分 -> {'❌ 无合格标的 (所有 < ' + str(int(MIN_BUY_SCORE)) + ')' if max_score < MIN_BUY_SCORE else '✅ 有买入信号'}")
     print(f"  扫描: " + ", ".join(f"{t}={s}" for t, s in sorted(scanner.items(), key=lambda x: -x[1])))
 
     # --- PART E: 最终决策 ---
@@ -379,10 +379,18 @@ def generate_decision(positions, mc_results, dcf_results, corr, account, scanner
 
     # BUY check
     if max_score < MIN_BUY_SCORE:
-        decisions.append(("🛑 买入", "所有标的得分 < 80 -> 无合格买入信号，禁止开新仓"))
+        decisions.append(("🛑 买入", f"所有标的得分 < {MIN_BUY_SCORE:.0f} -> 无合格买入信号，禁止开新仓"))
     else:
         best = max(scanner, key=scanner.get)
-        decisions.append(("🟢 买入", f"{best} 得分 {scanner[best]} >= 80 -> 可考虑开仓"))
+        try:
+            from smg_strategy.risk_patrol import can_buy_today, record_daily_buy, MAX_DAILY_BUYS
+            if not can_buy_today():
+                decisions.append(("🛑 买入", f"今日买入次数已达上限 ({MAX_DAILY_BUYS}) -> 熔断触发，禁止开新仓"))
+            else:
+                decisions.append(("🟢 买入", f"{best} 得分 {scanner[best]} >= {MIN_BUY_SCORE:.0f} -> 可考虑开仓"))
+                record_daily_buy(best)
+        except Exception:
+            decisions.append(("🟢 买入", f"{best} 得分 {scanner[best]} >= {MIN_BUY_SCORE:.0f} -> 可考虑开仓"))
 
     # Per-position check
     for pos in positions:
