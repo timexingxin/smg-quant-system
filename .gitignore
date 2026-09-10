@@ -1,0 +1,37 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment and Virtualenvs
+.venv/
+env/
+venv/
+ENV/
+.env
+
+# Logs and databases
+*.log
+dispatch.log
+hourly_smg.log
+*.sqlite3
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# SMG Runtime and Temporary Dumps
+cookies.txt
+*.cookie
+*.cookies
+_tmp_*
+*.png
+*.jpg
+*.jpeg
+*.xml
+*.html
+*.bak*
+
+# Node / npm
+node_modules/
+npm-debug.log*
