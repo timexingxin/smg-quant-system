@@ -1,6 +1,17 @@
 from dataclasses import dataclass
 from typing import Tuple
 
+try:
+    from .config import (
+        POSITION_CAP, SECTOR_CAP, MIN_UNUSED_BUYING_POWER, MIN_ORDER_SHARES,
+        DRAWDOWN_CAUTION, DRAWDOWN_DEFENSE, DRAWDOWN_STOP
+    )
+except ImportError:
+    from smg_strategy.config import (
+        POSITION_CAP, SECTOR_CAP, MIN_UNUSED_BUYING_POWER, MIN_ORDER_SHARES,
+        DRAWDOWN_CAUTION, DRAWDOWN_DEFENSE, DRAWDOWN_STOP
+    )
+
 
 @dataclass(frozen=True)
 class PositionSize:
@@ -14,11 +25,11 @@ def risk_state(peak_equity: float, current_equity: float) -> str:
     if peak_equity <= 0 or current_equity < 0:
         raise ValueError("equity values must be valid")
     drawdown = (peak_equity - current_equity) / peak_equity
-    if drawdown >= 0.09:
+    if drawdown >= DRAWDOWN_STOP:
         return "STOP"
-    if drawdown >= 0.075:
+    if drawdown >= DRAWDOWN_DEFENSE:
         return "DEFENSE"
-    if drawdown >= 0.05:
+    if drawdown >= DRAWDOWN_CAUTION:
         return "CAUTION"
     return "NORMAL"
 
@@ -50,9 +61,9 @@ def size_position(
     risk_budget = equity * risk_fraction
     risk_cap = risk_budget / stop_percent
     initial_cap = equity * 0.12
-    symbol_cap = max(0.0, equity * 0.20 - existing_symbol_value)
-    sector_cap = max(0.0, equity * 0.35 - sector_exposure)
-    buying_power_cap = max(0.0, buying_power * 0.85)
+    symbol_cap = max(0.0, equity * POSITION_CAP - existing_symbol_value)
+    sector_cap = max(0.0, equity * SECTOR_CAP - sector_exposure)
+    buying_power_cap = max(0.0, buying_power * (1.0 - MIN_UNUSED_BUYING_POWER))
     gross_cap = max(0.0, equity * gross_multiple - current_gross_exposure)
     market_value = min(
         risk_cap,
@@ -63,7 +74,7 @@ def size_position(
         gross_cap,
     )
     shares = int(market_value // price)
-    if shares < 10:
+    if shares < MIN_ORDER_SHARES:
         return PositionSize(0, 0, 0, ("minimum_shares",))
     market_value = shares * price
     return PositionSize(

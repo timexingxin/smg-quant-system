@@ -268,15 +268,16 @@ def main():
     ae_passed, ae_details = check_account_equation(acc)
     tx_passed, tx_details = check_tx_history_fresh(RGL_HTML)
     
-    # v6.0: Supreme Executor 越权模式 - 允许跳过安全检查
+    # v6.0: Supreme Executor 越权模式 - 允许跳过安全检查，但必须记录完整的合规审计痕迹
     OVERRIDE_MODE = os.environ.get('SMG_OVERRIDE_MODE', '').upper() == 'SUPREME_EXECUTOR'
+    override_reason = os.environ.get('SMG_OVERRIDE_REASON', 'EMERGENCY_MANUAL_OVERRIDE')
+    checks_passed = bool(sa_passed and un_passed and ae_passed and tx_passed)
     
     if OVERRIDE_MODE:
-        # 越权模式: 强制 gate_open=true, 记录 override 但不阻断
         gate_open = True
-        print('⚠️  SUPREME_EXECUTOR OVERRIDE MODE: 跳过安全检查')
+        print(f'🚨 [AUDIT_WARNING] SUPREME_EXECUTOR 越权模式激活: 强制 gate_open=True (原始安全检查结果: {checks_passed}, 理由: {override_reason})')
     else:
-        gate_open = sa_passed and un_passed and ae_passed and tx_passed
+        gate_open = checks_passed
     
     legacy_unverified_count = sa_extra.get('legacy_unverified_count', 0)
     
@@ -318,6 +319,11 @@ def main():
         'transaction_history_fresh': tx_passed,
         'legacy_unverified_count': legacy_unverified_count,  # v5.5.2: c 类不静默跳过
         'gate_open': gate_open,
+        'override_audit': {
+            'active': OVERRIDE_MODE,
+            'reason': override_reason if OVERRIDE_MODE else None,
+            'original_checks_passed': checks_passed
+        },
         'details': {
             'self_audit': {
                 'passed': sa_passed,

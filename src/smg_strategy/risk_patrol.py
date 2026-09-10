@@ -49,15 +49,39 @@ def log(msg):
     except Exception:
         pass
 
+try:
+    from .config import (
+        POSITION_CAP, TARGET_CAP_REDUCE_RATIO, STOP_LOSS, 
+        TRAILING_STOP, MAX_DAILY_BUYS as DEFAULT_MAX_BUYS
+    )
+except ImportError:
+    from smg_strategy.config import (
+        POSITION_CAP, TARGET_CAP_REDUCE_RATIO, STOP_LOSS, 
+        TRAILING_STOP, MAX_DAILY_BUYS as DEFAULT_MAX_BUYS
+    )
+
+PRICE_CACHE = {}  # symbol -> (price, timestamp)
+CACHE_TTL = 30.0  # 30 秒缓存有效时间，防止 0.5s 心跳打爆 Yahoo 限流
+
 def get_realtime_price_yahoo(symbol):
+    now = time.time()
+    if symbol in PRICE_CACHE:
+        cached_price, cached_time = PRICE_CACHE[symbol]
+        if now - cached_time < CACHE_TTL:
+            return cached_price
     try:
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1m"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=2) as resp:
             data = json.loads(resp.read().decode('utf-8'))
             meta = data['chart']['result'][0]['meta']
-            return meta.get('regularMarketPrice') or meta.get('chartPreviousClose')
+            price = meta.get('regularMarketPrice') or meta.get('chartPreviousClose')
+            if price is not None and price > 0:
+                PRICE_CACHE[symbol] = (price, now)
+            return price
     except Exception:
+        if symbol in PRICE_CACHE:
+            return PRICE_CACHE[symbol][0]
         return None
 
 # COOLDOWN DICTIONARY TO PREVENT SPAM (ticker -> timestamp)
@@ -118,31 +142,36 @@ def already_stopped_today(ticker, today_str):
     return bool(prev) and prev.get("date") == today_str
 
 # -------------------------------------------------------------
-# 【比赛冲刺模式 (Tournament Sprint Mode) 核心参数与防翻车安全锁】
+# 【集中度与建仓安全参数 (与 config.py 统一对齐)】
 # -------------------------------------------------------------
-POSITION_CAP_LIMIT = 35.0
-TARGET_CAP_REDUCE = 30.0
+POSITION_CAP_LIMIT = POSITION_CAP * 100.0        # 20.0% 单标的持仓硬上限
+TARGET_CAP_REDUCE = TARGET_CAP_REDUCE_RATIO * 100.0  # 17.5% 减仓目标安全水位
 DYNAMIC_CASH_TRANCHE_RATIO = 0.35
 
 def calculate_dynamic_tranche_shares(ticker, price, available_cash=23132.87):
-    """【比赛冲刺模式】根据可用现金的 35% 动态计算建仓股数，且不得低于 SMG 最少 10 股硬门槛"""
+    """根据可用现金比例动态计算建仓股数，且不得低于 SMG 最少 10 股硬门槛"""
     if price <= 0:
         return 10
     target_tranche_value = available_cash * DYNAMIC_CASH_TRANCHE_RATIO
     calculated_shares = int(target_tranche_value / price)
     final_shares = max(calculated_shares, 10)  # 保证不少于 10 股
-    log(f"⚡ [TOURNAMENT_TRANCHE] {ticker} @ ${price:.2f}: 可用现金 ${available_cash:.2f} (35%=${target_tranche_value:.2f}) -> 动态计算单批加仓股数 = {final_shares} 股")
+    log(f"⚡ [TRANCHE] {ticker} @ ${price:.2f}: 可用现金 ${available_cash:.2f} (35%=${target_tranche_value:.2f}) -> 动态计算单批加仓股数 = {final_shares} 股")
     return final_shares
 
 # 每日动量建仓熔断计数器 (Daily Buy Limit Counter)
 DAILY_BUY_COUNT = 0
-MAX_DAILY_BUYS = 2
-# 计数器归属的太平洋日期: 跨日(PT)自动重置; 周末/非交易日跳过检测,
-# 避免用周五陈旧收盘价产生脏信号提前耗尽周一额度 (2026-08-09 修复)
+MAX_DAILY_BUYS = DEFAULT_MAX_BUYS
+# 计数器归属的太平洋日期: 跨日(PT)自动重置; 周末/非交易日跳过检测
 COUNT_DAY = None
 
+def record_daily_buy(symbol):
+    """当真正生成买入意图或挂单时才递增单日配额，避免空耗限额"""
+    global DAILY_BUY_COUNT
+    DAILY_BUY_COUNT += 1
+    log(f"📝 [DAILY_BUY_QUOTA] 记录买入配额消耗: {symbol} (今日累计 {DAILY_BUY_COUNT}/{MAX_DAILY_BUYS})")
+
 def detect_momentum_breakout(symbol, realtime_price):
-    """【动量突破检测】避开 06:30-07:15 开盘诱多陷阱，只在 07:15 PT 之后且单日买入 < 2 次时触发"""
+    """【动量突破检测】避开 06:30-07:15 开盘诱多陷阱，只在 07:15 PT 之后且单日买入 < 2 次时返回信号 (不消耗配额)"""
     global DAILY_BUY_COUNT, COUNT_DAY
     now_dt = now_pt()  # 美西时间锚定 (平台规则以 PT 为准)
     current_time_str = now_dt.strftime("%H:%M")
@@ -175,9 +204,8 @@ def detect_momentum_breakout(symbol, realtime_price):
             prev_close = meta.get('chartPreviousClose') or meta.get('previousClose')
             if prev_close and prev_close > 0:
                 change_pct = ((realtime_price - prev_close) / prev_close) * 100.0
-                if change_pct >= 1.2: # 日内上涨 ≥ 1.2%
-                    log(f"🔥 [MOMENTUM_BREAKOUT] 07:15后动量确认: {symbol} 当前价 ${realtime_price:.2f} 日内大涨 +{change_pct:.2f}% (今日买入第 {DAILY_BUY_COUNT+1}/{MAX_DAILY_BUYS} 次)")
-                    DAILY_BUY_COUNT += 1
+                if change_pct >= 1.2:  # 日内上涨 ≥ 1.2%
+                    log(f"🔥 [MOMENTUM_BREAKOUT] 07:15后动量确认: {symbol} 当前价 ${realtime_price:.2f} 日内上涨 +{change_pct:.2f}% (当前额度 {DAILY_BUY_COUNT}/{MAX_DAILY_BUYS})")
                     return True, change_pct
     except Exception:
         pass
@@ -203,8 +231,6 @@ def execute_auto_stop_loss(ticker, shares_to_sell, reason, pnl_pct):
                     ledger = [ledger]
         
         # 幂等硬锁: 同一标的每自然日本守护进程只允许记录一条自动平仓意图
-        # 防止同一风控信号在 0.5s 心跳里重复写单: 重复 SUBMITTED 条目会破坏
-        # 06:15 self_audit 的 expected vs actual 差值 → 门闸关闭 (2026-08-08 SEDG 事故)
         today_str = now_pt().strftime("%Y-%m-%d")
         for _e in ledger:
             if (_e.get("ticker") == ticker
@@ -220,9 +246,7 @@ def execute_auto_stop_loss(ticker, shares_to_sell, reason, pnl_pct):
             "ticker": ticker,
             "action": "SELL",
             "size": shares_to_sell,
-            "reason": f"TOURNAMENT_SPRINT_EXECUTION: {reason}",
-            # 注意: 本守护进程没有券商 API 提交通道, 此状态不得用 SUBMITTED_PENDING_SETTLEMENT,
-            # 否则会污染 pre_market_gate 的 unresolved_orders / self_audit 检查导致门闸关闭
+            "reason": f"EXECUTION: {reason}",
             "status": "DAEMON_INTENT_PENDING_EXEC",
             "note": "local intent only; daemon has no broker submission path",
             "source": "quick_risk_patrol_daemon"
@@ -259,18 +283,6 @@ def check_risk_heartbeat():
     if not isinstance(holdings, dict):
         return
 
-    # 【1. SEDG 硬编码无条件清仓逻辑 (Fix Legacy Liquidation)】
-    # 无视 pnl_pct，只要周一（2026-08-10）及以后持仓中有 SEDG，无条件直接市价清仓所有 369 股！
-    current_date_str = now_pt().strftime("%Y-%m-%d")
-    if ("SEDG" in holdings
-            and not already_stopped_today("SEDG", current_date_str)
-            and (current_date_str >= "2026-08-10" or os.environ.get("FORCE_SEDG_SELL") == "1")):
-        sedg_info = holdings["SEDG"]
-        sedg_shares = sedg_info if isinstance(sedg_info, (int, float)) else (sedg_info.get("shares", 369) if isinstance(sedg_info, dict) else 369)
-        if sedg_shares > 0:
-            log(f"💥 [HARDCODED_LIQUIDATION] 周一比赛无条件清仓硬逻辑触发: 强制市价卖出全量 SEDG {sedg_shares} 股以回笼资金！")
-            execute_auto_stop_loss("SEDG", sedg_shares, "周一开盘硬编码无条件清仓 SEDG (释放 $12.5k 现金)", -26.0)
-
     for ticker, info in holdings.items():
         if ticker.startswith("_"):
             continue
@@ -281,8 +293,7 @@ def check_risk_heartbeat():
         if shares <= 0:
             continue
 
-        # 幂等硬闸: 今日已触发过止损/清仓的标的整体跳过 (持仓视为已扣减),
-        # 防止止损信号在 0.5s 心跳里循环重复写单 (2026-08-08 SEDG 事故根因)
+        # 幂等硬闸: 今日已触发过止损/清仓的标的整体跳过 (持仓视为已扣减)
         today_str = now_pt().strftime("%Y-%m-%d")
         if already_stopped_today(ticker, today_str):
             continue
@@ -291,7 +302,7 @@ def check_risk_heartbeat():
         if not realtime_price or realtime_price <= 0:
             continue
 
-        # 动态更新 5.0% Trailing Stop 峰值最高价 (High-Water Mark) 并持久化
+        # 动态更新 Trailing Stop 峰值最高价 (High-Water Mark) 并持久化
         peak_price = HIGH_WATER_MARK.get(ticker, realtime_price)
         if realtime_price > peak_price:
             HIGH_WATER_MARK[ticker] = realtime_price
@@ -301,29 +312,33 @@ def check_risk_heartbeat():
         pos_value = shares * realtime_price
         conc_pct = (pos_value / total_equity) * 100.0
 
-        # 【动量突破跟进检测】(受 07:15 PT 时间锁与单日 2 次熔断锁约束)
+        # 【动量突破跟进检测】
         is_breakout, chg = detect_momentum_breakout(ticker, realtime_price)
+        if is_breakout:
+            log(f"🔥 [MOMENTUM_BREAKOUT] 检测到日内突破信号: {ticker} (+{chg:.2f}%)")
 
-        # 【代码级 5.0% 动态移动止损算法】从最高点回撤 ≥ 5.0% 自动触发平仓
+        # 【代码级动态移动止损算法】从最高点回撤 ≥ TRAILING_STOP 自动触发平仓
+        trailing_stop_pct = TRAILING_STOP * 100.0
         drawdown_from_peak = ((peak_price - realtime_price) / peak_price) * 100.0
-        if drawdown_from_peak >= 5.0 and peak_price > cost_basis:
-            log(f"📉 [TRAILING_STOP] 5% 动态移动止损触发! {ticker} 峰值=${peak_price:.2f}, 当前价=${realtime_price:.2f}, 高点回撤={drawdown_from_peak:.2f}%")
-            execute_auto_stop_loss(ticker, shares, f"5% 动态移动止损 (高点回撤 {drawdown_from_peak:.2f}%)", -drawdown_from_peak)
+        if drawdown_from_peak >= trailing_stop_pct and peak_price > cost_basis:
+            log(f"📉 [TRAILING_STOP] 移动止损触发! {ticker} 峰值=${peak_price:.2f}, 当前价=${realtime_price:.2f}, 高点回撤={drawdown_from_peak:.2f}%")
+            execute_auto_stop_loss(ticker, shares, f"{trailing_stop_pct:.1f}% 动态移动止损 (高点回撤 {drawdown_from_peak:.2f}%)", -drawdown_from_peak)
 
-        if cost_basis > 0 and ticker != "SEDG":
+        hard_stop_loss_pct = abs(STOP_LOSS) * 100.0
+        if cost_basis > 0:
             pnl_pct = ((realtime_price - cost_basis) / cost_basis) * 100.0
-            # GAES -6% 硬止损触发
-            if pnl_pct <= -6.0:
-                log(f"🚨 GAES -6% 止损触发! {ticker} 当前价=${realtime_price:.2f}, 成本=${cost_basis:.2f}, 浮亏={pnl_pct:.2f}%")
-                execute_auto_stop_loss(ticker, shares, f"比赛冲刺清仓: GAES -6% 破位止损 ({pnl_pct:.2f}%)", pnl_pct)
+            # 硬止损触发
+            if pnl_pct <= -hard_stop_loss_pct:
+                log(f"🚨 止损触发! {ticker} 当前价=${realtime_price:.2f}, 成本=${cost_basis:.2f}, 浮亏={pnl_pct:.2f}%")
+                execute_auto_stop_loss(ticker, shares, f"硬止损破位: -{hard_stop_loss_pct:.1f}% ({pnl_pct:.2f}%)", pnl_pct)
         
-        # 比赛特供 35% 集中度控仓 (计算精准减仓股数)
+        # 集中度控仓 (计算精准减仓股数)
         if conc_pct > POSITION_CAP_LIMIT:
             target_val = total_equity * (TARGET_CAP_REDUCE / 100.0)
             excess_val = pos_value - target_val
             to_sell = int(excess_val / realtime_price) + 1
-            log(f"⚠️ 比赛集中度预警: {ticker} 占比={conc_pct:.1f}% > {POSITION_CAP_LIMIT}%, 需卖出 {to_sell} 股降低至 {TARGET_CAP_REDUCE}%")
-            execute_auto_stop_loss(ticker, min(to_sell, shares), f"比赛集中度突破 {POSITION_CAP_LIMIT}% ({conc_pct:.1f}%)", 0.0)
+            log(f"⚠️ 集中度预警: {ticker} 占比={conc_pct:.1f}% > {POSITION_CAP_LIMIT}%, 需卖出 {to_sell} 股降低至 {TARGET_CAP_REDUCE}%")
+            execute_auto_stop_loss(ticker, min(to_sell, shares), f"集中度突破 {POSITION_CAP_LIMIT}% ({conc_pct:.1f}%)", 0.0)
 
 def main():
     load_high_water_mark()

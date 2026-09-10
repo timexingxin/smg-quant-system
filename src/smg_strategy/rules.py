@@ -1,5 +1,14 @@
 from typing import List
 
+try:
+    from .config import (
+        MIN_STOCK_PRICE, MIN_MARKET_CAP, MIN_ORDER_SHARES
+    )
+except ImportError:
+    from smg_strategy.config import (
+        MIN_STOCK_PRICE, MIN_MARKET_CAP, MIN_ORDER_SHARES
+    )
+
 
 def validate_candidate(
     side: str,
@@ -21,11 +30,11 @@ def validate_candidate(
         reasons.append("side")
     if exchange not in {"NYSE", "NASDAQ"}:
         reasons.append("exchange")
-    if opening and (price < 3 or previous_close < 3):
+    if opening and (price < MIN_STOCK_PRICE or previous_close < MIN_STOCK_PRICE):
         reasons.append("price")
-    if market_cap < 25_000_000:
+    if market_cap < MIN_MARKET_CAP:
         reasons.append("market_cap")
-    if opening and shares < 10:
+    if opening and shares < MIN_ORDER_SHARES:
         reasons.append("shares")
     if side == "short" and asset_type in {"mutual_fund", "bond"}:
         reasons.append("asset_type")

@@ -1,3 +1,9 @@
+try:
+    from .config import MIN_BUY_SCORE, SHORT_BUY_SCORE
+except ImportError:
+    from smg_strategy.config import MIN_BUY_SCORE, SHORT_BUY_SCORE
+
+
 def _clamp(value: float) -> float:
     return max(0.0, min(100.0, value))
 
@@ -43,9 +49,9 @@ def score_short(
     )
 
 
-def qualifies_long(score: float) -> bool:
-    return score >= 72
+def qualifies_long(score: float, threshold: float = MIN_BUY_SCORE) -> bool:
+    return score >= threshold
 
 
-def qualifies_short(score: float, market_weak: bool) -> bool:
-    return market_weak and score >= 78
+def qualifies_short(score: float, market_weak: bool, threshold: float = SHORT_BUY_SCORE) -> bool:
+    return market_weak and score >= threshold

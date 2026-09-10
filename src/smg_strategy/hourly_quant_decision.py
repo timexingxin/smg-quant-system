@@ -45,13 +45,16 @@ SCANNER = {
     "NVDA": 57, "PLTR": 57, "MSFT": 55,
 }
 
-# 硬约束
-STOP_LOSS = -0.06          # -6% 死线
-MIN_BUY_SCORE = 80         # 最低买入分
-POSITION_CAP = 0.20        # 单仓上限 20% equity
+try:
+    from smg_strategy.config import (
+        STOP_LOSS, MIN_BUY_SCORE, POSITION_CAP, RISK_FREE_RATE as RISK_FREE, TRADING_DAYS_YEAR
+    )
+except ImportError:
+    from config import (
+        STOP_LOSS, MIN_BUY_SCORE, POSITION_CAP, RISK_FREE_RATE as RISK_FREE, TRADING_DAYS_YEAR
+    )
+
 REMAINING_DAYS = 38        # 剩余交易日 (至8月底约38天)
-TRADING_DAYS_YEAR = 252
-RISK_FREE = 0.0475         # 无风险利率 ~4.75%
 
 # =========================================================================
 # SECTION 1: 持仓风险矩阵 — 核心诊断
@@ -433,7 +436,7 @@ def generate_decision(positions, mc_results, dcf_results, corr, account, scanner
   ╠══════════════════════════════════════════════════════════════════╣""")
 
     buy_count = sum(1 for d in decisions if "买入" in d[0] and "禁止" not in d[1])
-    sell_count = sum(1 for d in decisions if "止损" in d[0])
+    sell_count = sum(1 for d in decisions if "强制止损" in d[0])
     reduce_count = sum(1 for d in decisions if "减仓" in d[0])
     monitor_count = sum(1 for d in decisions if "监控" in d[0])
     trail_count = sum(1 for d in decisions if "上移" in d[0])
@@ -457,7 +460,8 @@ def generate_decision(positions, mc_results, dcf_results, corr, account, scanner
         print(f"  {ticker:<6} {mc['expected_return']:>7.1%} {mc['var_95']:>7.1%} "
               f"{mc['cvar_95']:>8.1%} {mc['prob_stop']:>7.1%} {stop_day_str}")
 
-    return decisions
+    worst_pos = min(positions, key=lambda p: p["distance_to_stop_pct"]) if positions else None
+    return decisions, worst_pos
 
 
 # =========================================================================
@@ -525,7 +529,7 @@ def main():
     corr = correlation_analysis(held_tickers)
 
     # Generate decisions
-    decisions = generate_decision(positions, mc_results, dcf_results, corr, ACCOUNT, SCANNER)
+    decisions, worst_position = generate_decision(positions, mc_results, dcf_results, corr, ACCOUNT, SCANNER)
 
     # Actionable output
     print("\n" + "=" * 72)
@@ -534,7 +538,7 @@ def main():
 
     has_action = False
     for icon_title, detail in decisions:
-        if "止损" in icon_title:
+        if "强制止损" in icon_title:
             for pos in positions:
                 if pos["pnl_pct"] <= STOP_LOSS:
                     print(f"  -> 卖出 {pos['ticker']} x {pos['qty']} 股 @ ${pos['current_price']:.2f}")
@@ -553,7 +557,10 @@ def main():
 
     if not has_action:
         print(f"  -> 【核心指令】按兵不动。无触发止损、无合格买入信号。")
-        print(f"  -> 下次巡检继续监控 MSTR (最接近止损线，距止损仅 {worst_position['distance_to_stop_pct']:.1%})。")
+        if worst_position:
+            print(f"  -> 下次巡检继续监控 {worst_position['ticker']} (最接近止损线，距止损仅 {worst_position['distance_to_stop_pct']:.1%})。")
+        else:
+            print(f"  -> 当前无持仓，维持观望。")
 
     print("\n" + "=" * 72)
     print("  ANALYSIS COMPLETE.")

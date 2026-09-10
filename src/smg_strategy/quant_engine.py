@@ -48,15 +48,23 @@ SCANNER = {
     "PLTR": {"score": 55, "price": 126.93},
 }
 
-# V3.0 参数
-STOP_LOSS = -0.06
-MIN_BUY_SCORE = 60          # V3.0: 从 80 降至 60
-POSITION_CAP = 0.25          # V3.0: 从 20% 提至 25%
+# 引入统一参数治理中心
+try:
+    from smg_strategy.config import (
+        STOP_LOSS, MIN_BUY_SCORE, POSITION_CAP, RISK_FREE_RATE as RISK_FREE,
+        EQUITY_RISK_PREMIUM, DEFAULT_TERMINAL_GROWTH, TRADING_DAYS_YEAR,
+        MAX_KELLY_FRACTION, CORRELATION_CLUSTER_THRESHOLD, TARGET_CAP_REDUCE
+    )
+except ImportError:
+    from config import (
+        STOP_LOSS, MIN_BUY_SCORE, POSITION_CAP, RISK_FREE_RATE as RISK_FREE,
+        EQUITY_RISK_PREMIUM, DEFAULT_TERMINAL_GROWTH, TRADING_DAYS_YEAR,
+        MAX_KELLY_FRACTION, CORRELATION_CLUSTER_THRESHOLD, TARGET_CAP_REDUCE
+    )
+
 TARGET_EQUITY = 110000.0
 REMAINING_DAYS = 37
-TRADING_DAYS_YEAR = 252
-RISK_FREE = 0.0475
-MAX_LEVERAGE = 1.50          # V3.0: 允许 1.5x 杠杆
+MAX_LEVERAGE = 1.25
 
 # =========================================================================
 # SECTION 1: 历史波动率与市场参数获取
@@ -101,6 +109,7 @@ def fetch_market_params(ticker: str, retries=3) -> Optional[Dict]:
                 "closes": closes,
                 "highs": highs,
                 "lows": lows,
+                "volumes": volumes,
             }
         except Exception as e:
             if attempt < retries - 1:
@@ -113,14 +122,18 @@ def fetch_market_params(ticker: str, retries=3) -> Optional[Dict]:
 # SECTION 2: DCF 内在价值模型
 # =========================================================================
 
-def dcf_intrinsic_value(ticker: str, market_price: float) -> Dict:
-    """多阶段 DCF 估值模型"""
+def dcf_intrinsic_value(ticker: str, market_price: float, info: Optional[Dict] = None) -> Dict:
+    """
+    多阶段 DCF 估值模型（真实股本 + 动态资本结构 WACC + 动态增长率预期）
+    支持传入 info 字典以进行离线回测与确定性单测。
+    """
     try:
-        import yfinance as yf
-        stock = yf.Ticker(ticker)
-        info = stock.info
+        if info is None:
+            import yfinance as yf
+            stock = yf.Ticker(ticker)
+            info = stock.info
 
-        # 自由现金流
+        # 自由现金流获取与回退估算
         fcf = info.get('freeCashflow', None)
         if fcf is None or fcf <= 0:
             ocf = info.get('operatingCashflow', 0) or info.get('totalCashFromOperatingActivities', 0) or 0
@@ -130,40 +143,51 @@ def dcf_intrinsic_value(ticker: str, market_price: float) -> Dict:
                 fcf = (info.get('ebitda', 0) or 0) * 0.55
 
         market_cap = info.get('marketCap', None) or 1e10
-        shares = market_cap / market_price if market_price > 0 else 1e9
+        # 优先使用真实在外流通股本，避免市值/现价数据源不同步造成的同比例污染 (P2-7 & 3.4)
+        shares = info.get('sharesOutstanding') or (market_cap / market_price if market_price > 0 else 1e9)
         fcf_per_share = fcf / shares if shares > 0 else 0
 
+        # 动态资本结构 WACC 计算 (P2-3)
         beta = info.get('beta', 1.2)
         if beta is None or beta <= 0:
             beta = 1.2
-        erp = 0.055  # equity risk premium
-        wacc = RISK_FREE + beta * erp
+        cost_of_equity = RISK_FREE + beta * EQUITY_RISK_PREMIUM
+
+        total_debt = info.get('totalDebt', 0) or 0
+        if market_cap > 0 and total_debt > 0:
+            total_cap = market_cap + total_debt
+            we = market_cap / total_cap
+            wd = total_debt / total_cap
+            pretax_cost_of_debt = 0.0525
+            tax_rate = 0.21
+            cost_of_debt = pretax_cost_of_debt * (1 - tax_rate)
+            wacc = we * cost_of_equity + wd * cost_of_debt
+        else:
+            wacc = cost_of_equity
+
         wacc = max(0.06, min(wacc, 0.15))
 
-        # 行业增长假设 (基于分析师共识)
-        growth_map = {
-            'NVDA': 0.20, 'AMD': 0.18, 'AAPL': 0.09, 'MSFT': 0.12,
-            'PLTR': 0.22, 'TSLA': 0.18, 'MSTR': 0.12, 'MU': 0.15,
-            'GEV': 0.14, 'VST': 0.10, 'SMR': 0.25, 'CRWV': 0.08,
-        }
-        g1 = growth_map.get(ticker, 0.08)
-        g1 = max(0.03, min(g1, 0.35))
-        terminal_g = 0.03
+        # 动态增长率提取（去除手写死字典，优先拉取财报预期） (P2-7)
+        raw_growth = info.get('earningsGrowth') or info.get('revenueGrowth')
+        if raw_growth is not None and -0.5 <= raw_growth <= 2.0:
+            g1 = raw_growth
+        else:
+            # 行业默认稳健增长率
+            g1 = 0.08
+        g1 = max(0.03, min(g1, 0.30))
+        terminal_g = DEFAULT_TERMINAL_GROWTH
         growth_years = 5
 
-        # 阶段1: 高增长
+        # 阶段1: 高增长折现
         pv = 0.0
         cf = fcf_per_share
         for yr in range(1, growth_years + 1):
             cf *= (1 + g1)
             pv += cf / ((1 + wacc) ** yr)
 
-        # 终值
+        # 终值折现 (因 wacc >= 6% 恒大于 terminal_g = 3%，wacc - terminal_g 必定正数) (P2-4)
         terminal_fcf = cf * (1 + terminal_g)
-        if wacc > terminal_g:
-            terminal_value = terminal_fcf / (wacc - terminal_g)
-        else:
-            terminal_value = terminal_fcf / 0.03
+        terminal_value = terminal_fcf / (wacc - terminal_g)
         pv_terminal = terminal_value / ((1 + wacc) ** growth_years)
 
         fair_value = pv + pv_terminal
@@ -186,6 +210,7 @@ def dcf_intrinsic_value(ticker: str, market_price: float) -> Dict:
             "fair_value": round(fair_value, 2),
             "mos": round(mos, 4),
             "wacc": round(wacc, 4),
+            "cost_of_equity": round(cost_of_equity, 4),
             "growth_s1": round(g1, 4),
             "fcf_per_share": round(fcf_per_share, 2),
             "beta": round(beta, 2),
@@ -222,8 +247,13 @@ class MCResult:
 
 def run_monte_carlo(ticker: str, score: int, entry_price: float,
                     market_params: Dict, n_paths: int = 100_000,
-                    horizon_days: int = None, stop_loss: float = STOP_LOSS) -> MCResult:
-    """GBM 蒙特卡洛 + 日内止损监控"""
+                    horizon_days: int = None, stop_loss: float = STOP_LOSS,
+                    sub_steps: int = 4) -> MCResult:
+    """
+    GBM 蒙特卡洛模拟（含 Broadie-Glasserman-Kou 连续首达时位移修正）
+    通过每天 sub_steps=4 个亚步长与 BGK 修正位移止损线，精确逼近日内连续止损触碰概率，
+    彻底解决日频收盘离散采样系统性低估止损概率 (~6.37%) 的问题。
+    """
     if horizon_days is None:
         horizon_days = REMAINING_DAYS
 
@@ -232,22 +262,32 @@ def run_monte_carlo(ticker: str, score: int, entry_price: float,
     if sigma_d <= 0:
         sigma_d = 0.018
 
-    drift = mu_d - 0.5 * sigma_d ** 2
+    # BGK 位移修正: 连续首达时边界在离散监控下的有效等价边界
+    # beta_bgk = -zeta(1/2) / sqrt(2*pi) ~= 0.5826
+    dt = 1.0 / sub_steps
+    total_steps = int(horizon_days * sub_steps)
+    mu_step = (mu_d - 0.5 * sigma_d ** 2) * dt
+    sigma_step = sigma_d * np.sqrt(dt)
 
-    # 向量化模拟 [n_paths, horizon_days]
-    Z = np.random.randn(n_paths, horizon_days)
-    log_returns = drift + sigma_d * Z
+    bgk_shift = 0.5826 * sigma_step
+    # 对于下边界 stop_loss (如 -6%)，离散采样等价于将下边界上移，消除漏检
+    effective_stop_loss = (1.0 + stop_loss) * np.exp(bgk_shift) - 1.0
+
+    # 向量化模拟 [n_paths, total_steps]
+    Z = np.random.randn(n_paths, total_steps)
+    log_returns = mu_step + sigma_step * Z
     log_prices = np.log(entry_price) + np.cumsum(log_returns, axis=1)
     prices = np.exp(log_prices)
 
     returns_vs_entry = prices / entry_price - 1.0
 
-    # 止损检测
-    stopped = np.any(returns_vs_entry <= stop_loss, axis=1)
+    # 止损检测（使用 BGK 修正后的等价连续止损线）
+    stopped = np.any(returns_vs_entry <= effective_stop_loss, axis=1)
     prob_stopped = float(np.mean(stopped))
 
-    stop_days = np.argmax(returns_vs_entry <= stop_loss, axis=1)
-    stop_days[~stopped] = horizon_days
+    stop_steps = np.argmax(returns_vs_entry <= effective_stop_loss, axis=1)
+    stop_days = (stop_steps / sub_steps).astype(float)
+    stop_days[~stopped] = float(horizon_days)
 
     final_return = np.where(stopped, stop_loss, returns_vs_entry[:, -1])
     expected_return = float(np.mean(final_return))
@@ -278,7 +318,7 @@ def run_monte_carlo(ticker: str, score: int, entry_price: float,
         win_rate = float(np.mean(win_mask))
         if avg_loss > 0:
             kelly_f = win_rate - (1 - win_rate) / (avg_win / avg_loss)
-            kelly_f = max(0.0, min(kelly_f, 0.40))
+            kelly_f = max(0.0, min(kelly_f, MAX_KELLY_FRACTION))
         else:
             kelly_f = 0.0
     else:
@@ -286,10 +326,10 @@ def run_monte_carlo(ticker: str, score: int, entry_price: float,
 
     ev_dollar = expected_return
 
-    # V3.0 建议
-    if score >= MIN_BUY_SCORE and expected_return > 0.015 and prob_stopped < 0.45:
+    # 建议评级
+    if score >= MIN_BUY_SCORE and expected_return > 0.015 and prob_stopped < 0.50:
         rec = "🟢 STRONG BUY"
-    elif expected_return > 0.005 and prob_stopped < 0.55:
+    elif expected_return > 0.005 and prob_stopped < 0.60:
         rec = "🟡 WEAK BUY"
     elif expected_return > -0.02:
         rec = "🟠 HOLD"
@@ -444,27 +484,32 @@ def compute_atr(highs, lows, closes, period=14):
 # SECTION 5: 相关性矩阵 & 组合优化
 # =========================================================================
 
-def correlation_analysis(tickers: List[str]) -> Dict:
-    """计算标的间相关性矩阵"""
+def correlation_analysis(tickers: List[str], threshold: float = CORRELATION_CLUSTER_THRESHOLD, prices_dict: Optional[Dict[str, Any]] = None) -> Dict:
+    """
+    计算标的间对数收益率相关性矩阵，并使用标准并查集（Union-Find）精确获取传递连通闭包集群，
+    彻底消除原贪心算法在链式相关（A<->B, B<->C）时漏检隐藏风险集群的缺陷。
+    支持传入 prices_dict 以进行离线测试与自定义数据分析。
+    """
     try:
-        import yfinance as yf
         prices = {}
-        for t in tickers:
-            data = yf.download(t, period="3mo", progress=False)
-            if len(data) >= 30:
-                prices[t] = data['Close'].values.flatten()
+        if prices_dict is not None:
+            for t, p in prices_dict.items():
+                arr = np.asarray(p, dtype=float).flatten()
+                if len(arr) >= 5:
+                    prices[t] = arr
+        else:
+            import yfinance as yf
+            for t in tickers:
+                data = yf.download(t, period="3mo", progress=False)
+                if len(data) >= 30:
+                    prices[t] = data['Close'].values.flatten()
         if len(prices) < 2:
             return {"clusters": [], "avg_corr": 0}
 
         # 对齐长度
         min_len = min(len(v) for v in prices.values())
-        aligned = {}
-        for t, p in prices.items():
-            aligned[t] = p[-min_len:]
-
-        rets = {}
-        for t, p in aligned.items():
-            rets[t] = np.diff(np.log(p))
+        aligned = {t: p[-min_len:] for t, p in prices.items()}
+        rets = {t: np.diff(np.log(p)) for t, p in aligned.items()}
 
         n = len(rets)
         corr_mat = np.zeros((n, n))
@@ -478,21 +523,28 @@ def correlation_analysis(tickers: List[str]) -> Dict:
                     min_l = min(len(r1), len(r2))
                     corr_mat[i, j] = np.corrcoef(r1[:min_l], r2[:min_l])[0, 1]
 
-        # 找高相关集群 (>0.70)
-        clusters = []
-        visited = set()
-        for i in range(n):
-            if i in visited:
-                continue
-            cluster = [ticker_list[i]]
-            for j in range(i + 1, n):
-                if corr_mat[i, j] > 0.70:
-                    cluster.append(ticker_list[j])
-                    visited.add(j)
-            if len(cluster) > 1:
-                clusters.append(cluster)
-            visited.add(i)
+        # 并查集实现传递闭包求连通分量
+        parent = list(range(n))
+        def find(x):
+            if parent[x] != x:
+                parent[x] = find(parent[x])
+            return parent[x]
+        def union(x, y):
+            rx, ry = find(x), find(y)
+            if rx != ry:
+                parent[rx] = ry
 
+        for i in range(n):
+            for j in range(i + 1, n):
+                if corr_mat[i, j] > threshold:
+                    union(i, j)
+
+        groups = {}
+        for i in range(n):
+            root = find(i)
+            groups.setdefault(root, []).append(ticker_list[i])
+
+        clusters = [members for members in groups.values() if len(members) > 1]
         avg_corr = float(np.mean(corr_mat[np.triu_indices(n, k=1)]))
 
         return {
@@ -505,32 +557,56 @@ def correlation_analysis(tickers: List[str]) -> Dict:
         return {"clusters": [], "avg_corr": 0, "error": "fetch failed"}
 
 
-def portfolio_kelly_allocation(mc_results: List[MCResult], account: Dict) -> Dict:
-    """基于 Kelly Criterion 的最优组合配置"""
-    # 过滤有正期望的标的
+def portfolio_kelly_allocation(mc_results: List[MCResult], account: Dict, holdings: Optional[List[Dict]] = None) -> Dict:
+    """
+    基于 Kelly 准则的最优组合配置引擎
+    【P0-2 修复】：硬性拦截单仓集中度上限！若 (现有市值 + 拟买入金额) > 20% 上限，
+    强制压缩该标的分配额度至可用剩余空间；若无剩余空间或低于 10 股，直接拒绝分配。
+    """
     valid = [r for r in mc_results if r.kelly_f > 0 and r.score >= MIN_BUY_SCORE]
     if not valid:
-        return {"allocations": [], "total_invest": 0}
+        return {"allocations": [], "blocked": [], "total_invest": 0, "max_new_invest": 0}
 
-    # 按 Kelly f 排序
     valid.sort(key=lambda x: x.kelly_f, reverse=True)
 
-    # 资金分配: 先用现金, 再用部分融资
     available = account["cash"] + (account["buying_power"] - account["cash"]) * 0.5
-    # 限制: 最多用 $50k 新增资金
     max_new_invest = min(available, 50000.0)
+
+    # 统计每只标的的已有市值
+    existing_mv_map = {}
+    if holdings:
+        for h in holdings:
+            t = h["ticker"]
+            qty = h.get("qty", 0)
+            price = h.get("current", h.get("current_price", 0.0))
+            existing_mv_map[t] = existing_mv_map.get(t, 0.0) + qty * price
 
     total_kelly = sum(r.kelly_f for r in valid)
     allocations = []
-
+    blocked = []
     remaining = max_new_invest
+
     for r in valid:
+        existing_mv = existing_mv_map.get(r.ticker, 0.0)
+        max_allowed_mv = account["equity"] * POSITION_CAP
+        headroom = max(0.0, max_allowed_mv - existing_mv)
+
+        # 集中度硬拦截
+        if headroom <= 0:
+            blocked.append({
+                "ticker": r.ticker,
+                "reason": f"现有持仓 ${existing_mv:,.2f} 已达/超 20% 集中度上限 (${max_allowed_mv:,.2f})，硬拦截禁止追加！"
+            })
+            continue
+
         weight = r.kelly_f / total_kelly if total_kelly > 0 else 1.0 / len(valid)
-        target_amount = min(max_new_invest * weight, account["equity"] * POSITION_CAP)
+        raw_target = max_new_invest * weight
+        target_amount = min(raw_target, headroom)
         target_amount = min(target_amount, remaining)
         shares = int(target_amount / r.entry_price)
         actual_amount = shares * r.entry_price
-        if shares > 0 and actual_amount > 500:
+
+        if shares >= 10 and actual_amount > 500:
             allocations.append({
                 "ticker": r.ticker,
                 "score": r.score,
@@ -538,11 +614,20 @@ def portfolio_kelly_allocation(mc_results: List[MCResult], account: Dict) -> Dic
                 "shares": shares,
                 "amount": round(actual_amount, 2),
                 "entry_price": r.entry_price,
+                "pre_mv": round(existing_mv, 2),
+                "post_mv": round(existing_mv + actual_amount, 2),
+                "post_conc": round((existing_mv + actual_amount) / account["equity"], 4),
             })
             remaining -= actual_amount
+        elif shares < 10:
+            blocked.append({
+                "ticker": r.ticker,
+                "reason": f"可用额度计算股数 {shares} 股低于 SMG 最少 10 股合规门槛，硬拦截取消开仓"
+            })
 
     return {
         "allocations": allocations,
+        "blocked": blocked,
         "total_invest": round(sum(a["amount"] for a in allocations), 2),
         "max_new_invest": round(max_new_invest, 2),
     }
@@ -655,10 +740,10 @@ def main():
         params = fetch_market_params(ticker)
         if params:
             market_data[ticker] = params
-            # 计算技术指标
+            # 计算技术指标 (P1-2 修复: 传入真实成交量序列)
             tech = compute_technical_indicators(
                 params["closes"], params["highs"], params["lows"],
-                np.ones_like(params["closes"]) * params.get("avg_vol", 1e6)
+                params.get("volumes", np.ones_like(params["closes"]) * params.get("avg_vol", 1e6))
             )
             tech_indicators[ticker] = tech
             print(f"σ={params['sigma_annual']:.1%}, μ={params['mu_annual']:.1%}, "
@@ -747,20 +832,25 @@ def main():
     # ===== STEP 6: Kelly 组合优化 & 买入计划 =====
     print_header("STEP 6/6: V3.0 Kelly 组合优化 & 买入决策")
 
-    alloc = portfolio_kelly_allocation(mc_results, ACCOUNT)
+    alloc = portfolio_kelly_allocation(mc_results, ACCOUNT, HOLDINGS)
 
     if alloc["allocations"]:
         print(f"\n  💰 可用新增资金: ${alloc['max_new_invest']:,.2f}")
-        print(f"  📊 V3.0 买入计划 (按Kelly仓位):")
-        print(f"\n  {'Ticker':<6} {'Score':>5} {'Kelly':>7} {'Shares':>7} {'Amount':>10} {'Price':>8}")
-        print(f"  {'-'*50}")
+        print(f"  📊 V3.0 买入计划 (按Kelly仓位，严格受20%单仓集中度硬约束):")
+        print(f"\n  {'Ticker':<6} {'Score':>5} {'Kelly':>7} {'Shares':>7} {'Amount':>10} {'Price':>8} {'买后占比':>8}")
+        print(f"  {'-'*60}")
         for a in alloc["allocations"]:
             print(f"  {a['ticker']:<6} {a['score']:>5} {a['kelly_f']:>6.1%} {a['shares']:>7} "
-                  f"${a['amount']:>9,.2f} ${a['entry_price']:>7.2f}")
-        print(f"  {'-'*50}")
+                  f"${a['amount']:>9,.2f} ${a['entry_price']:>7.2f} {a['post_conc']:>7.1%}")
+        print(f"  {'-'*60}")
         print(f"  合计买入: ${alloc['total_invest']:,.2f}")
     else:
         print(f"\n  ⚠️  Kelly 模型未产生任何正期望买入信号 (score≥{MIN_BUY_SCORE})")
+
+    if alloc.get("blocked"):
+        print(f"\n  🛡️  Kelly 集中度/合规硬拦截记录 ({len(alloc['blocked'])} 笔被拦截):")
+        for b in alloc["blocked"]:
+            print(f"     🛑 {b['ticker']}: {b['reason']}")
 
     # =========================================================================
     # FINAL: 三模型融合矩阵
