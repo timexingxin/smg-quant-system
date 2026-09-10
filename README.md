@@ -8,25 +8,9 @@ A financial-grade automated quantitative trading and risk management system desi
 
 ---
 
-## 🏛️ System Architecture
-
-```mermaid
-graph TD
-    A[US Equity Universe: NASDAQ / NYSE] --> B[Module 1: SMG Rule Engine & Multi-Factor Screener]
-    B --> C[Candidate Screening Pool]
-    C --> D[Module 2: Chief Quant 4-Model Fusion Engine]
-    subgraph D [Quantitative Validation & Synthesis]
-        D1[Multi-Stage DCF Intrinsic Valuation]
-        D2[100k-Path Monte Carlo GBM with Intraday Stop]
-        D3[Technical Analysis Suite: EMA, RSI, MACD, ATR]
-        D4[Kelly Portfolio Optimization & Correlation Matrix]
-    end
-    D --> E[Module 3: Drawdown State Machine & Position Sizing]
-    E --> F[Module 4: 9-State Order State Machine & Pre-Trade Gate]
-    F --> G[Order Execution Layer]
-    G --> H[Module 5: 0.5s High-Frequency Risk Patrol Daemon]
-    H -->|GAES -6% / 5% Trailing Stop / Concentration Cap| G
-```
+<p align="center">
+  <img src="assets/system_architecture.png" alt="SMG System Architecture" width="850"/>
+</p>
 
 ---
 
@@ -66,6 +50,8 @@ graph TD
 
 ```
 .
+├── assets/
+│   └── system_architecture.png     # High-resolution system architecture diagram
 ├── config/
 │   └── example_snapshot.json       # Sanitized sample portfolio & market input
 ├── src/

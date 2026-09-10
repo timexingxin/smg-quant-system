@@ -25,9 +25,6 @@ cookies.txt
 *.cookie
 *.cookies
 _tmp_*
-*.png
-*.jpg
-*.jpeg
 *.xml
 *.html
 *.bak*
@@ -35,3 +32,7 @@ _tmp_*
 # Node / npm
 node_modules/
 npm-debug.log*
+
+# Allow assets directory for documentation
+!assets/
+!assets/*
