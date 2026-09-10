@@ -9,7 +9,7 @@ A financial-grade automated quantitative trading and risk management system desi
 ---
 
 <p align="center">
-  <img src="assets/system_architecture.png" alt="SMG System Architecture" width="850"/>
+  <img src="assets/system_architecture.svg" alt="SMG System Architecture" width="850"/>
 </p>
 
 ---
