@@ -1,7 +1,7 @@
 # SMG Quantitative Trading System (Stock Market Game)
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-32%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-39%20passed-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
 
 A financial-grade automated quantitative trading, risk management, and historical backtesting system designed for **The Stock Market Game (SMG)**. Features multi-factor screening, 4-pillar quantitative synthesis (DCF with dynamic WACC, Broadie-Glasserman-Kou discrete-barrier corrected 100k-path Monte Carlo VaR, Union-Find correlation clustering, Kelly portfolio optimization), dynamic drawdown state machines, a 0.5s real-time risk patrol daemon, and a full Point-in-Time historical backtesting engine with SPY benchmark comparison.
@@ -105,11 +105,11 @@ pip install numpy scipy pandas yfinance
 ### 2. Run the Comprehensive Unit Test Suite
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -v
-# Output: Ran 32 tests in 0.015s ... OK
+# Output: Ran 39 tests in 0.142s ... OK
 ```
 
 ### 3. Run Historical Point-in-Time Backtesting
-Test quantitative strategies against historical data with automated SPY benchmark comparison and ASCII equity curves:
+Test quantitative strategies against historical data with automated SPY benchmark comparison, next-day open execution ($t+1$ Open), and ASCII equity curves:
 
 ```bash
 # Quick backtest on top tech leaders
@@ -119,13 +119,11 @@ PYTHONPATH=src python3 strategy_cli.py --backtest --tickers "AAPL,NVDA,MSFT,AMZN
 PYTHONPATH=src python3 strategy_cli.py --backtest --tickers "AAPL,NVDA,GOOGL" --start "2024-01-01" --end "2024-04-01" --json-output backtest_results.json
 ```
 
-**Key Backtest Performance Metrics Reported**:
-- Total Return vs Benchmark SPY Return
-- Annualized Compound Return (CAGR) & Annualized Volatility
-- Sharpe Ratio ($R_f = 4.75\%$)
-- Maximum Drawdown & Maximum Drawdown Duration (trading days)
-- Calmar Ratio & Jensen's Alpha / Beta
-- Trade Win Rate (%) & Profit Factor
+**Key Backtest Capabilities & Performance Metrics**:
+- **Point-in-Time Execution**: Eliminates lookahead bias by scoring on day $t$ close and filling orders at day $t+1$ Open with slippage.
+- **Realistic Slippage & Gap-Down Stops**: Factors in overnight gap-down risks (`min(target_stop, open)`).
+- **Walk-Forward Overfitting Analysis**: Built-in `run_walk_forward()` utility splits historical regimes to measure out-of-sample decay.
+- **Metrics Reported**: Excess Return vs SPY, Total Return, CAGR, Annualized Volatility, Sharpe Ratio ($R_f = 4.75\%$), Maximum Drawdown, Calmar Ratio, Jensen's Alpha, Beta, Win Rate, and Profit Factor.
 
 ### 4. Generate Strategy Review Packet
 ```bash
