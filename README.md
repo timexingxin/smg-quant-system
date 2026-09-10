@@ -51,7 +51,8 @@ A financial-grade automated quantitative trading and risk management system desi
 ```
 .
 ├── assets/
-│   └── system_architecture.png     # High-resolution system architecture diagram
+│   ├── system_architecture.svg     # Lossless vector architecture diagram
+│   └── system_architecture.png     # 3x Retina Ultra-HD architecture diagram (2760x1680)
 ├── config/
 │   └── example_snapshot.json       # Sanitized sample portfolio & market input
 ├── src/
