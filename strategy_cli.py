@@ -36,9 +36,21 @@ def main() -> None:
     parser.add_argument("--benchmark", type=str, default="SPY", help="Benchmark ticker (default: SPY)")
     parser.add_argument("--json-output", type=Path, default=None, help="Export backtest metrics as JSON file")
 
+    # Interactive Dashboard arguments
+    parser.add_argument("--dashboard", action="store_true", help="Launch interactive Web UI dashboard on localhost")
+    parser.add_argument("--port", type=int, default=8088, help="Port for interactive dashboard (default: 8088)")
+    parser.add_argument("--export-dashboard", type=Path, default=None, help="Export standalone HTML dashboard to path")
+
     args = parser.parse_args()
 
-    if args.backtest:
+    if args.dashboard:
+        from smg_strategy.dashboard import serve_dashboard
+        serve_dashboard(port=args.port)
+    elif args.export_dashboard:
+        from smg_strategy.dashboard import export_dashboard
+        out = export_dashboard(args.export_dashboard)
+        print(f"📊 交互式量化 Web 仪表盘已导出至: {out.resolve()}")
+    elif args.backtest:
         from smg_strategy.backtest import BacktestConfig, BacktestEngine
         ticker_list = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
         cfg = BacktestConfig(
@@ -60,7 +72,7 @@ def main() -> None:
             print(f"💾 回测详细指标已保存至: {args.json_output}")
     else:
         if not args.snapshot or not args.output:
-            parser.error("snapshot and --output are required when not running in --backtest mode")
+            parser.error("snapshot and --output are required when not running in --backtest or --dashboard mode")
         generate_report(args.snapshot, args.output, args.market_weak)
 
 
