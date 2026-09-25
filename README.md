@@ -12,7 +12,7 @@ An institutional-grade automated quantitative trading, risk management, and hist
 ---
 
 <p align="center">
-  <img src="assets/system_architecture.svg" alt="SMG System Architecture" width="850"/>
+  <img src="assets/system_architecture_en.svg" alt="SMG System Architecture" width="850"/>
 </p>
 
 ---
@@ -136,8 +136,8 @@ PYTHONPATH=src python3 strategy_cli.py --export-dashboard dashboard.html
 ```
 .
 ├── assets/
-│   ├── system_architecture.svg       # Lossless vector architecture diagram
-│   ├── system_architecture.png       # 3x Retina Ultra-HD architecture diagram
+│   ├── system_architecture_en.svg    # Lossless vector architecture diagram (English)
+│   ├── system_architecture_en.png    # 3x Retina Ultra-HD architecture diagram
 │   └── dashboard_preview.html        # Pre-rendered interactive Web UI preview
 ├── config/
 │   └── example_snapshot.json         # Sanitized sample portfolio & market input
