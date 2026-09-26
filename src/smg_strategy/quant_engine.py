@@ -12,7 +12,7 @@ SMG V3.0 激进冲刺量化验证引擎 — Chief Quant Analyst
 import numpy as np
 from scipy import stats, optimize
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional, Union
 import json, sys, warnings, time
 warnings.filterwarnings('ignore')
 
@@ -262,7 +262,7 @@ class MCResult:
 def run_monte_carlo(ticker: str, score: int, entry_price: float,
                     market_params: Dict, n_paths: int = 100_000,
                     horizon_days: int = None, stop_loss: float = STOP_LOSS,
-                    sub_steps: int = 4, seed: int = None) -> MCResult:
+                    sub_steps: int = 4, seed: Optional[Union[int, np.random.Generator]] = None) -> MCResult:
     """
     GBM 蒙特卡洛模拟（含 Broadie-Glasserman-Kou 连续首达时位移修正）
     通过每天 sub_steps=4 个亚步长与 BGK 修正位移止损线，精确逼近日内连续止损触碰概率，
@@ -271,8 +271,7 @@ def run_monte_carlo(ticker: str, score: int, entry_price: float,
     if horizon_days is None:
         horizon_days = REMAINING_DAYS
 
-    if seed is not None:
-        np.random.seed(seed)
+    rng = np.random.default_rng(seed)
 
     mu_d = market_params.get("mu_daily", market_params.get("daily_drift", 0.0003))
     sigma_d = market_params.get("sigma_daily", None)
@@ -296,7 +295,7 @@ def run_monte_carlo(ticker: str, score: int, entry_price: float,
     effective_stop_loss = (1.0 + stop_loss) * np.exp(bgk_shift) - 1.0
 
     # 向量化模拟 [n_paths, total_steps]
-    Z = np.random.randn(n_paths, total_steps)
+    Z = rng.standard_normal((n_paths, total_steps))
     log_returns = mu_step + sigma_step * Z
     log_prices = np.log(entry_price) + np.cumsum(log_returns, axis=1)
     prices = np.exp(log_prices)

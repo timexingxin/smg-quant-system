@@ -241,4 +241,4 @@ python3 src/smg_strategy/risk_patrol.py
 
 - **Educational & Virtual Simulation Only**: This codebase is engineered strictly for educational research, quantitative modeling, and risk-management analysis within the virtual simulation environment of **The Stock Market Game (SMG)**.
 - **Not Investment Advice**: None of the analytical calculations, DCF valuations, Kelly allocations, or quantitative signals constitute financial, investment, accounting, or legal advice.
-- **No Live Brokerage Execution**: This system does not connect to live financial brokers, does not place orders on actual financial exchanges, and carries zero real-money financial risk.
+- **No Live Brokerage Execution**: The software does not directly execute real-money trades or connect to live brokerage accounts.

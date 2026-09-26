@@ -12,7 +12,9 @@ if _src not in sys.path:
 if _root not in sys.path:
     sys.path.insert(0, _root)
 
+import numpy as np
 from smg_strategy.quant_engine import run_monte_carlo
+from smg_strategy.hourly_quant_decision import mc_stop_loss_risk
 
 
 class TestEnvironmentIsolation(unittest.TestCase):
@@ -93,6 +95,94 @@ class TestEnvironmentIsolation(unittest.TestCase):
         self.assertAlmostEqual(res1.median_return, res2.median_return, places=6)
         self.assertAlmostEqual(res1.prob_profit, res2.prob_profit, places=6)
         self.assertAlmostEqual(res1.sharpe_ratio, res2.sharpe_ratio, places=6)
+
+    def test_monte_carlo_identical_seed_repeatability(self):
+        """Monte Carlo simulations must produce identical outputs given the same seed across all fields."""
+        params = {"daily_drift": 0.0003, "daily_vol": 0.015}
+        res1 = run_monte_carlo(
+            ticker="TEST", score=80, entry_price=100.0,
+            market_params=params, n_paths=1000, horizon_days=30, seed=42,
+        )
+        res2 = run_monte_carlo(
+            ticker="TEST", score=80, entry_price=100.0,
+            market_params=params, n_paths=1000, horizon_days=30, seed=42,
+        )
+        self.assertEqual(res1.prob_stopped, res2.prob_stopped)
+        self.assertEqual(res1.expected_return, res2.expected_return)
+        self.assertEqual(res1.median_return, res2.median_return)
+        self.assertEqual(res1.prob_profit, res2.prob_profit)
+        self.assertEqual(res1.sharpe_ratio, res2.sharpe_ratio)
+        self.assertEqual(res1.p5_return, res2.p5_return)
+        self.assertEqual(res1.p95_return, res2.p95_return)
+        self.assertEqual(res1.max_dd_avg, res2.max_dd_avg)
+        self.assertEqual(res1, res2)
+
+        # Verify hourly_quant_decision mc_stop_loss_risk repeatability
+        mc1 = mc_stop_loss_risk(
+            cost_per_share=100.0, current_price=100.0,
+            sigma_daily=0.015, mu_daily=0.0003, horizon_days=30, n_paths=1000, seed=42,
+        )
+        mc2 = mc_stop_loss_risk(
+            cost_per_share=100.0, current_price=100.0,
+            sigma_daily=0.015, mu_daily=0.0003, horizon_days=30, n_paths=1000, seed=42,
+        )
+        self.assertEqual(mc1, mc2)
+
+    def test_monte_carlo_seed_variance(self):
+        """Monte Carlo simulations with different seeds must produce divergent results."""
+        params = {"daily_drift": 0.0003, "daily_vol": 0.015}
+        res1 = run_monte_carlo(
+            ticker="TEST", score=80, entry_price=100.0,
+            market_params=params, n_paths=1000, horizon_days=30, seed=42,
+        )
+        res2 = run_monte_carlo(
+            ticker="TEST", score=80, entry_price=100.0,
+            market_params=params, n_paths=1000, horizon_days=30, seed=2026,
+        )
+        self.assertNotEqual(res1.expected_return, res2.expected_return)
+
+        mc1 = mc_stop_loss_risk(
+            cost_per_share=100.0, current_price=100.0,
+            sigma_daily=0.015, mu_daily=0.0003, horizon_days=30, n_paths=1000, seed=42,
+        )
+        mc2 = mc_stop_loss_risk(
+            cost_per_share=100.0, current_price=100.0,
+            sigma_daily=0.015, mu_daily=0.0003, horizon_days=30, n_paths=1000, seed=2026,
+        )
+        self.assertNotEqual(mc1["expected_return"], mc2["expected_return"])
+
+    def test_monte_carlo_global_rng_state_immutability(self):
+        """Calling Monte Carlo must never alter or pollute global np.random state."""
+        np.random.seed(987654321)
+        state_before = np.random.get_state()
+        reference_draws = [np.random.rand() for _ in range(5)]
+        np.random.set_state(state_before)
+
+        params = {"daily_drift": 0.0003, "daily_vol": 0.015}
+        _ = run_monte_carlo(
+            ticker="TEST", score=80, entry_price=100.0,
+            market_params=params, n_paths=500, horizon_days=20, seed=42,
+        )
+        _ = run_monte_carlo(
+            ticker="TEST", score=80, entry_price=100.0,
+            market_params=params, n_paths=500, horizon_days=20, seed=None,
+        )
+        _ = mc_stop_loss_risk(
+            cost_per_share=100.0, current_price=100.0,
+            sigma_daily=0.015, mu_daily=0.0003, horizon_days=20, n_paths=500, seed=99,
+        )
+        _ = mc_stop_loss_risk(
+            cost_per_share=100.0, current_price=100.0,
+            sigma_daily=0.015, mu_daily=0.0003, horizon_days=20, n_paths=500, seed=None,
+        )
+
+        state_after = np.random.get_state()
+        self.assertEqual(state_before[0], state_after[0])
+        self.assertTrue(np.array_equal(state_before[1], state_after[1]))
+        self.assertEqual(state_before[2:], state_after[2:])
+
+        actual_draws = [np.random.rand() for _ in range(5)]
+        self.assertEqual(reference_draws, actual_draws)
 
 
 if __name__ == "__main__":

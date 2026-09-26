@@ -134,14 +134,15 @@ def estimate_volatility(ticker: str) -> dict:
 
 
 def mc_stop_loss_risk(cost_per_share, current_price, sigma_daily, mu_daily,
-                       horizon_days=38, n_paths=50000, stop_loss=-0.06):
+                       horizon_days=38, n_paths=50000, stop_loss=-0.06, seed=None):
     """蒙特卡洛: 估计 horizon_days 内触发 -6% 止损的概率"""
     if sigma_daily <= 0:
         sigma_daily = 0.02
 
     drift = mu_daily - 0.5 * sigma_daily**2
 
-    Z = np.random.randn(n_paths, horizon_days)
+    rng = np.random.default_rng(seed)
+    Z = rng.standard_normal((n_paths, horizon_days))
     log_returns = drift + sigma_daily * Z
     log_prices = np.log(current_price) + np.cumsum(log_returns, axis=1)
     prices = np.exp(log_prices)
