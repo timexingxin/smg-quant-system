@@ -1,13 +1,14 @@
 # SMG Quantitative Trading System (Stock Market Game)
 
+[![CI](https://github.com/timexingxin/smg-quant-system/actions/workflows/ci.yml/badge.svg)](https://github.com/timexingxin/smg-quant-system/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-42%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-45%20passed-brightgreen.svg)]()
 [![KaTeX](https://img.shields.io/badge/KaTeX-Math_Verified-00F0FF.svg)]()
 [![UI](https://img.shields.io/badge/UI-Interactive_Web_Terminal-8B5CF6.svg)]()
 [![Risk Shield](https://img.shields.io/badge/Risk_Shield-0.5s_Patrol-orange.svg)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-An institutional-grade automated quantitative trading, risk management, and historical backtesting system designed for **The Stock Market Game (SMG)**. Features multi-factor screening, 4-pillar quantitative synthesis (DCF with dynamic WACC, Broadie-Glasserman-Kou discrete-barrier corrected 100k-path Monte Carlo VaR, Union-Find correlation clustering, Kelly portfolio optimization), dynamic drawdown state machines, a 0.5s real-time risk patrol daemon, a full Point-in-Time historical backtesting engine with SPY benchmark comparison, and an interactive modern Web UI dashboard.
+An educational quantitative research, risk management, and historical backtesting system designed for **The Stock Market Game (SMG)** virtual simulation. Features multi-factor screening, 4-pillar quantitative synthesis (DCF with dynamic WACC, Broadie-Glasserman-Kou discrete-barrier corrected 100k-path Monte Carlo VaR, Union-Find correlation clustering, Kelly portfolio optimization), dynamic drawdown state machines, a 0.5s real-time risk patrol daemon, a full Point-in-Time historical backtesting engine with SPY benchmark comparison, and an interactive modern Web UI dashboard.
 
 ---
 
@@ -111,13 +112,13 @@ The system features a zero-dependency, modern FinTech dark-mode interactive Web 
 
 ```bash
 # 1. Launch live interactive quant terminal in browser (default: http://127.0.0.1:8088)
-PYTHONPATH=src python3 strategy_cli.py --dashboard
+python3 strategy_cli.py --dashboard
 
 # 2. Specify a custom listening port
-PYTHONPATH=src python3 strategy_cli.py --dashboard --port 9090
+python3 strategy_cli.py --dashboard --port 9090
 
 # 3. Export as a standalone, zero-dependency HTML dashboard for sharing or presentation
-PYTHONPATH=src python3 strategy_cli.py --export-dashboard dashboard.html
+python3 strategy_cli.py --export-dashboard dashboard.html
 ```
 
 ### Dashboard Core Visual Capabilities
@@ -176,27 +177,30 @@ PYTHONPATH=src python3 strategy_cli.py --export-dashboard dashboard.html
 
 ## 🚀 Getting Started
 
-### 1. Requirements
+### 1. Requirements & Installation
 - Python 3.10+
 - `numpy`, `scipy`, `pandas`, `yfinance`
 
 ```bash
-pip install numpy scipy pandas yfinance
+git clone https://github.com/timexingxin/smg-quant-system.git
+cd smg-quant-system
+pip install -r requirements.txt
+pip install -e .
 ```
 
 ### 2. Run Comprehensive Unit Test Suite
 ```bash
-PYTHONPATH=src python3 -m unittest discover -s tests -v
-# Output: Ran 42 tests in 0.089s ... OK
+python3 -m unittest discover -s tests -v
+# Output: Ran 45 tests in ~0.1s ... OK
 ```
 
 ### 3. Launch Interactive Web UI Dashboard
 ```bash
 # Start local interactive server
-PYTHONPATH=src python3 strategy_cli.py --dashboard
+python3 strategy_cli.py --dashboard
 
 # Or generate portable HTML dashboard report
-PYTHONPATH=src python3 strategy_cli.py --export-dashboard assets/dashboard_preview.html
+python3 strategy_cli.py --export-dashboard assets/dashboard_preview.html
 ```
 
 ### 4. Run Historical Point-in-Time Backtesting
@@ -204,10 +208,10 @@ Test quantitative strategies against historical data with automated SPY benchmar
 
 ```bash
 # Quick backtest on top tech leaders
-PYTHONPATH=src python3 strategy_cli.py --backtest --tickers "AAPL,NVDA,MSFT,AMZN" --start "2024-01-01" --end "2024-06-30"
+python3 strategy_cli.py --backtest --tickers "AAPL,NVDA,MSFT,AMZN" --start "2024-01-01" --end "2024-06-30"
 
 # Backtest with JSON output export
-PYTHONPATH=src python3 strategy_cli.py --backtest --tickers "AAPL,NVDA,GOOGL" --start "2024-01-01" --end "2024-04-01" --json-output backtest_results.json
+python3 strategy_cli.py --backtest --tickers "AAPL,NVDA,GOOGL" --start "2024-01-01" --end "2024-04-01" --json-output backtest_results.json
 ```
 
 **Key Backtest Capabilities & Performance Metrics**:
@@ -218,21 +222,23 @@ PYTHONPATH=src python3 strategy_cli.py --backtest --tickers "AAPL,NVDA,GOOGL" --
 
 ### 5. Generate Strategy Review Packet
 ```bash
-PYTHONPATH=src python3 strategy_cli.py config/example_snapshot.json --output latest_report.md
+python3 strategy_cli.py config/example_snapshot.json --output latest_report.md
 ```
 
 ### 6. Run Chief Quant 4-Model Validation Engine
 ```bash
-PYTHONPATH=src python3 src/smg_strategy/quant_engine.py
+python3 src/smg_strategy/quant_engine.py
 ```
 
 ### 7. Run High-Frequency Risk Patrol Daemon
 ```bash
-PYTHONPATH=src python3 src/smg_strategy/risk_patrol.py
+python3 src/smg_strategy/risk_patrol.py
 ```
 
 ---
 
-## ⚖️ Disclaimer
+## ⚖️ Financial & Educational Disclaimer
 
-This codebase is developed strictly for educational and research purposes within the virtual simulation of **The Stock Market Game (SMG)**. It does not constitute financial, investment, or legal advice.
+- **Educational & Virtual Simulation Only**: This codebase is engineered strictly for educational research, quantitative modeling, and risk-management analysis within the virtual simulation environment of **The Stock Market Game (SMG)**.
+- **Not Investment Advice**: None of the analytical calculations, DCF valuations, Kelly allocations, or quantitative signals constitute financial, investment, accounting, or legal advice.
+- **No Live Brokerage Execution**: The software does not directly execute real-money trades or connect to live brokerage accounts.

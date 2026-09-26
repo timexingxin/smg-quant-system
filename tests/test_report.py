@@ -1,7 +1,17 @@
+import sys
+from pathlib import Path
+
+# Ensure src/ is on sys.path regardless of execution mode or runner
+_src = str(Path(__file__).resolve().parent.parent / "src")
+_root = str(Path(__file__).resolve().parent.parent)
+if _src not in sys.path:
+    sys.path.insert(0, _src)
+if _root not in sys.path:
+    sys.path.insert(0, _root)
+
 import json
 import tempfile
 import unittest
-from pathlib import Path
 
 from smg_strategy.models import Snapshot
 from smg_strategy.report import build_proposals, render_review_packet

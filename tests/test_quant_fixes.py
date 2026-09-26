@@ -1,5 +1,17 @@
+import sys
+from pathlib import Path
+
+# Ensure src/ is on sys.path regardless of execution mode or runner
+_src = str(Path(__file__).resolve().parent.parent / "src")
+if _src not in sys.path:
+    sys.path.insert(0, _src)
+
+import os
 import unittest
 import numpy as np
+
+# Disable file logging in tests by default
+os.environ["SMG_DISABLE_FILE_LOG"] = "1"
 
 from smg_strategy.quant_engine import (
     MCResult,
@@ -221,24 +233,29 @@ class QuantEngineFixesTests(unittest.TestCase):
         import json
         import smg_strategy.pre_market_gate as pmg
 
+        import tempfile
         # 模拟核心持仓对账失败 (sa_passed=False)
-        with patch.dict(os.environ, {
-            "SMG_OVERRIDE_MODE": "SUPREME_EXECUTOR",
-            "SMG_OVERRIDE_REASON": "Valid override test reason exceeding ten characters"
-        }):
-            with patch("smg_strategy.pre_market_gate.load_baseline", return_value={}), \
-                 patch("smg_strategy.pre_market_gate.load_ledger", return_value=[]), \
-                 patch("smg_strategy.pre_market_gate.fetch_holdings", return_value=({}, {})), \
-                 patch("smg_strategy.pre_market_gate.check_self_audit", return_value=(False, 100, {}, {})), \
-                 patch("smg_strategy.pre_market_gate.check_unresolved_orders", return_value=(True, 0, [])), \
-                 patch("smg_strategy.pre_market_gate.check_account_equation", return_value=(True, {})), \
-                 patch("smg_strategy.pre_market_gate.check_tx_history_fresh", return_value=(False, {})), \
-                 patch("builtins.open", mock_open()) as m_open:
-                pmg.main()
-                written = "".join(call.args[0] for call in m_open().write.call_args_list)
-                if written:
-                    gate_doc = json.loads(written)
-                    self.assertFalse(gate_doc["gate_open"], "核心对账失败时，越权模式绝不能开闸！")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with patch.dict(os.environ, {
+                "SMG_OVERRIDE_MODE": "SUPREME_EXECUTOR",
+                "SMG_OVERRIDE_REASON": "Valid override test reason exceeding ten characters",
+                "SMG_STATE_DIR": tmp_dir,
+                "SMG_DISABLE_FILE_LOG": "1",
+            }):
+                with patch("smg_strategy.pre_market_gate.load_baseline", return_value={}), \
+                     patch("smg_strategy.pre_market_gate.load_ledger", return_value=[]), \
+                     patch("smg_strategy.pre_market_gate.fetch_holdings", return_value=({}, {})), \
+                     patch("smg_strategy.pre_market_gate.check_self_audit", return_value=(False, 100, {}, {})), \
+                     patch("smg_strategy.pre_market_gate.check_unresolved_orders", return_value=(True, 0, [])), \
+                     patch("smg_strategy.pre_market_gate.check_account_equation", return_value=(True, {})), \
+                     patch("smg_strategy.pre_market_gate.check_tx_history_fresh", return_value=(False, {})), \
+                     patch("builtins.open", mock_open()) as m_open:
+                    pmg.GATE_PATH = os.path.join(tmp_dir, "pre_market_gate.json")
+                    pmg.main()
+                    written = "".join(call.args[0] for call in m_open().write.call_args_list)
+                    if written:
+                        gate_doc = json.loads(written)
+                        self.assertFalse(gate_doc["gate_open"], "核心对账失败时，越权模式绝不能开闸！")
 
 
 if __name__ == "__main__":

@@ -36,9 +36,9 @@ import json, os, sys, time
 from datetime import datetime
 from pathlib import Path
 
-SMG_DIR = os.environ.get('SMG_DIR', os.path.expanduser('~/.gemini/antigravity/scratch/smg'))
-LOCKS_PATH = f'{SMG_DIR}/ticker_locks.json'
-OLD_PATH = f'{SMG_DIR}/server_lockout.json'
+SMG_DIR = os.environ.get('SMG_STATE_DIR', os.environ.get('SMG_DIR', os.path.join(os.getcwd(), 'state')))
+LOCKS_PATH = os.environ.get('SMG_LOCKS_PATH', os.path.join(SMG_DIR, 'ticker_locks.json'))
+OLD_PATH = os.environ.get('SMG_OLD_LOCKS_PATH', os.path.join(SMG_DIR, 'server_lockout.json'))
 LOCK_THRESHOLD = 2  # v1 旧格式 10 min 内 2+ 次 attempts 升级为 TICKER_LOCKED
 
 def load_locks():
@@ -50,6 +50,9 @@ def load_locks():
 
 def save_locks(locks):
     locks['updated_at'] = datetime.now().isoformat()
+    target_dir = os.path.dirname(LOCKS_PATH)
+    if target_dir:
+        os.makedirs(target_dir, exist_ok=True)
     with open(LOCKS_PATH, 'w') as f: json.dump(locks, f, indent=2)
 
 def migrate():
