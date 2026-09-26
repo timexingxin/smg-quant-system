@@ -1,3 +1,10 @@
+import sys
+from pathlib import Path
+
+# Ensure src/ is on sys.path regardless of execution mode or runner
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import unittest
 
 from smg_strategy.models import Snapshot

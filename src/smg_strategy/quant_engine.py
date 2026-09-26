@@ -17,36 +17,33 @@ import json, sys, warnings, time
 warnings.filterwarnings('ignore')
 
 # =========================================================================
-# SECTION 0: 实时数据输入
+# =========================================================================
+# SECTION 0: 示例基准输入 (Sanitized Demo Fixtures)
 # =========================================================================
 
-ACCOUNT = {
-    "equity": 100515.78,
-    "buying_power": 87527.07,
-    "cash": 37205.87,
+DEFAULT_DEMO_ACCOUNT = {
+    "equity": 100_000.00,
+    "buying_power": 150_000.00,
+    "cash": 40_000.00,
 }
 
-HOLDINGS = [
-    {"ticker": "AAPL", "date": "2026-07-08", "qty": 10,  "cost_total": 3120.10,  "current": 313.042},
-    {"ticker": "AMD",  "date": "2026-07-07", "qty": 35,  "cost_total": 18001.30, "current": 548.134},
-    {"ticker": "MSTR", "date": "2026-07-07", "qty": 39,  "cost_total": 3812.68,  "current": 96.239},
-    {"ticker": "MU",   "date": "2026-07-06", "qty": 9,   "cost_total": 9066.00,  "current": 976.935},
-    {"ticker": "NVDA", "date": "2026-07-07", "qty": 10,  "cost_total": 1928.70,  "current": 206.996},
-    {"ticker": "NVDA", "date": "2026-07-07", "qty": 100, "cost_total": 19741.00, "current": 206.996},
-    {"ticker": "NVDA", "date": "2026-07-07", "qty": 10,  "cost_total": 1981.80,  "current": 206.996},
-    {"ticker": "NVDA", "date": "2026-07-07", "qty": 10,  "cost_total": 1926.80,  "current": 206.996},
+DEFAULT_DEMO_HOLDINGS = [
+    {"ticker": "AAPL", "date": "2026-01-15", "qty": 50,  "cost_total": 9000.00,  "current": 185.00},
+    {"ticker": "MSFT", "date": "2026-01-15", "qty": 30,  "cost_total": 12000.00, "current": 410.00},
+    {"ticker": "NVDA", "date": "2026-01-15", "qty": 80,  "cost_total": 9600.00,  "current": 125.00},
 ]
 
-# V2.0 Scanner 结果
-SCANNER = {
-    "AMD":  {"score": 68, "price": 547.86},
-    "NVDA": {"score": 63, "price": 206.93},
-    "GEV":  {"score": 63, "price": 1073.19},
-    "AAPL": {"score": 60, "price": 313.01},
-    "TSLA": {"score": 60, "price": 406.90},
-    "MSFT": {"score": 55, "price": 384.12},
-    "PLTR": {"score": 55, "price": 126.93},
+DEFAULT_DEMO_SCANNER = {
+    "AAPL": {"score": 75, "price": 185.00},
+    "MSFT": {"score": 70, "price": 410.00},
+    "NVDA": {"score": 68, "price": 125.00},
+    "AMZN": {"score": 65, "price": 180.00},
+    "GOOGL": {"score": 62, "price": 175.00},
 }
+
+ACCOUNT = DEFAULT_DEMO_ACCOUNT
+HOLDINGS = DEFAULT_DEMO_HOLDINGS
+SCANNER = DEFAULT_DEMO_SCANNER
 
 # 引入统一参数治理中心
 try:
@@ -265,7 +262,7 @@ class MCResult:
 def run_monte_carlo(ticker: str, score: int, entry_price: float,
                     market_params: Dict, n_paths: int = 100_000,
                     horizon_days: int = None, stop_loss: float = STOP_LOSS,
-                    sub_steps: int = 4) -> MCResult:
+                    sub_steps: int = 4, seed: int = None) -> MCResult:
     """
     GBM 蒙特卡洛模拟（含 Broadie-Glasserman-Kou 连续首达时位移修正）
     通过每天 sub_steps=4 个亚步长与 BGK 修正位移止损线，精确逼近日内连续止损触碰概率，
@@ -273,6 +270,9 @@ def run_monte_carlo(ticker: str, score: int, entry_price: float,
     """
     if horizon_days is None:
         horizon_days = REMAINING_DAYS
+
+    if seed is not None:
+        np.random.seed(seed)
 
     mu_d = market_params.get("mu_daily", market_params.get("daily_drift", 0.0003))
     sigma_d = market_params.get("sigma_daily", None)

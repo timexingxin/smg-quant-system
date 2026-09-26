@@ -36,3 +36,10 @@ npm-debug.log*
 # Allow assets directory for documentation
 !assets/
 !assets/*
+
+# Python packaging & verification gate
+*.egg-info/
+dist/
+build/
+state/
+.verification/

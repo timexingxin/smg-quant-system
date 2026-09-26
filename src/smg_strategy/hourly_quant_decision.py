@@ -18,32 +18,28 @@ import json, sys, warnings
 warnings.filterwarnings('ignore')
 
 # =========================================================================
-# SECTION 0: 当前账户与持仓快照 (来自系统)
+# SECTION 0: 示例基准输入 (Sanitized Demo Fixtures)
 # =========================================================================
 
-ACCOUNT = {
-    "equity": 99300.20,
-    "buying_power": 86918.07,
-    "cash": 37205.87,
+DEFAULT_DEMO_ACCOUNT = {
+    "equity": 100_000.00,
+    "buying_power": 150_000.00,
+    "cash": 40_000.00,
 }
 
-# 持仓明细 (每笔独立交易)
-HOLDINGS = [
-    {"ticker": "AAPL", "date": "2026-07-08", "qty": 10,  "cost_basis": 3120.10,  "prev_close": 313.39, "current": 316.156, "chg_pct": 0.883},
-    {"ticker": "AMD",  "date": "2026-07-07", "qty": 35,  "cost_basis": 18001.30, "prev_close": 517.405,"current": 546.686, "chg_pct": 5.659},
-    {"ticker": "MSTR", "date": "2026-07-07", "qty": 39,  "cost_basis": 3812.68,  "prev_close": 93.87,  "current": 93.955,  "chg_pct": 0.091},
-    {"ticker": "MU",   "date": "2026-07-06", "qty": 9,   "cost_basis": 9066.00,  "prev_close": 948.80,  "current": 991.179, "chg_pct": 4.467},
-    {"ticker": "NVDA", "date": "2026-07-07", "qty": 100, "cost_basis": 19741.00, "prev_close": 204.12,  "current": 202.764, "chg_pct": -0.666},
-    {"ticker": "NVDA", "date": "2026-07-07", "qty": 10,  "cost_basis": 1928.70,  "prev_close": 204.12,  "current": 202.764, "chg_pct": -0.666},
-    {"ticker": "NVDA", "date": "2026-07-07", "qty": 10,  "cost_basis": 1981.80,  "prev_close": 204.12,  "current": 202.764, "chg_pct": -0.666},
-    {"ticker": "NVDA", "date": "2026-07-07", "qty": 10,  "cost_basis": 1926.80,  "prev_close": 204.12,  "current": 202.764, "chg_pct": -0.666},
+DEFAULT_DEMO_HOLDINGS = [
+    {"ticker": "AAPL", "date": "2026-01-15", "qty": 50,  "cost_basis": 9000.00,  "prev_close": 182.00, "current": 185.000, "chg_pct": 1.648},
+    {"ticker": "MSFT", "date": "2026-01-15", "qty": 30,  "cost_basis": 12000.00, "prev_close": 405.00, "current": 410.000, "chg_pct": 1.235},
+    {"ticker": "NVDA", "date": "2026-01-15", "qty": 80,  "cost_basis": 9600.00,  "prev_close": 122.00, "current": 125.000, "chg_pct": 2.459},
 ]
 
-# V2.0 Scanner 结果
-SCANNER = {
-    "AAPL": 65, "GEV": 63, "AMD": 62, "TSLA": 58,
-    "NVDA": 57, "PLTR": 57, "MSFT": 55,
+DEFAULT_DEMO_SCANNER = {
+    "AAPL": 75, "MSFT": 70, "NVDA": 68, "AMZN": 65, "GOOGL": 62,
 }
+
+ACCOUNT = DEFAULT_DEMO_ACCOUNT
+HOLDINGS = DEFAULT_DEMO_HOLDINGS
+SCANNER = DEFAULT_DEMO_SCANNER
 
 try:
     from smg_strategy.config import (

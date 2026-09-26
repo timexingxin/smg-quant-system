@@ -21,16 +21,16 @@ import json, os, re, sys, subprocess
 from datetime import datetime, date
 from pathlib import Path
 
-SMG_DIR = os.environ.get('SMG_DIR', os.path.expanduser('~/.gemini/antigravity/scratch/smg'))
-GATE_PATH = f'{SMG_DIR}/pre_market_gate.json'
-BASELINE_PATH = f'{SMG_DIR}/holdings_baseline.json'
-BASELINE_V2_PATH = f'{SMG_DIR}/holdings_baseline_v2.json'
+SMG_DIR = os.environ.get('SMG_STATE_DIR', os.environ.get('SMG_DIR', os.path.join(os.getcwd(), 'state')))
+GATE_PATH = os.environ.get('SMG_GATE_PATH', os.path.join(SMG_DIR, 'pre_market_gate.json'))
+BASELINE_PATH = os.environ.get('SMG_BASELINE_PATH', os.path.join(SMG_DIR, 'holdings_baseline.json'))
+BASELINE_V2_PATH = os.environ.get('SMG_BASELINE_V2_PATH', os.path.join(SMG_DIR, 'holdings_baseline_v2.json'))
 # v5.5.2: v2 baseline 优先 (含 correction metadata), v1 保留作 audit trail
 def _load_active_baseline_path():
     if os.path.exists(BASELINE_V2_PATH):
         return BASELINE_V2_PATH
     return BASELINE_PATH
-LEDGER_PATH = f'{SMG_DIR}/order_ledger.json'
+LEDGER_PATH = os.environ.get('SMG_LEDGER_PATH', os.path.join(SMG_DIR, 'order_ledger.json'))
 
 # 用 env 传 TradePassword (避免 bash heredoc + $VAR 替换坑)
 TRADE_PASS = os.environ.get('TRADE_PASS', '')
@@ -362,6 +362,9 @@ def main():
             'recovered_fill': 'server-confirmed but missing from local ledger (e.g. EOD batch settlement)',
         },
     }
+    gate_dir = os.path.dirname(GATE_PATH)
+    if gate_dir:
+        os.makedirs(gate_dir, exist_ok=True)
     with open(GATE_PATH, 'w') as f: json.dump(gate, f, indent=2)
     
     status = '🟢 OPEN' if gate_open else '🔴 CLOSED'
