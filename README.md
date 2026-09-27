@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/timexingxin/smg-quant-system/actions/workflows/ci.yml/badge.svg)](https://github.com/timexingxin/smg-quant-system/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-45%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-48%20passed-brightgreen.svg)]()
 [![KaTeX](https://img.shields.io/badge/KaTeX-Math_Verified-00F0FF.svg)]()
 [![UI](https://img.shields.io/badge/UI-Interactive_Web_Terminal-8B5CF6.svg)]()
 [![Risk Shield](https://img.shields.io/badge/Risk_Shield-0.5s_Patrol-orange.svg)]()
@@ -191,7 +191,7 @@ pip install -e .
 ### 2. Run Comprehensive Unit Test Suite
 ```bash
 python3 -m unittest discover -s tests -v
-# Output: Ran 45 tests in ~0.1s ... OK
+# Current suite: Ran 48 tests ... OK (runtime varies by machine)
 ```
 
 ### 3. Launch Interactive Web UI Dashboard
