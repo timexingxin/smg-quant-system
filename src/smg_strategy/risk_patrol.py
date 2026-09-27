@@ -26,9 +26,9 @@ except Exception:
 def now_pt():
     return datetime.datetime.now(PT_TZ)
 
-SMG_DIR = os.path.dirname(os.path.abspath(__file__))
-BASELINE_PATH = os.path.join(SMG_DIR, "holdings_baseline.json")
-LOG_PATH = os.path.join(SMG_DIR, "dispatch.log")
+SMG_DIR = os.environ.get('SMG_STATE_DIR', os.environ.get('SMG_DIR', os.path.join(os.getcwd(), 'state')))
+BASELINE_PATH = os.environ.get('SMG_BASELINE_PATH', os.path.join(SMG_DIR, "holdings_baseline.json"))
+LOG_PATH = os.environ.get('SMG_LOG_PATH', os.path.join(SMG_DIR, "dispatch.log"))
 RUNNING = True
 
 def signal_handler(signum, frame):
@@ -43,7 +43,14 @@ def log(msg):
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     line = f"[{now}] [RISK_DAEMON] {msg}"
     print(line)
+    if os.environ.get("SMG_DISABLE_FILE_LOG", "").lower() in ("1", "true"):
+        return
+    if not LOG_PATH:
+        return
     try:
+        log_dir = os.path.dirname(LOG_PATH)
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
         with open(LOG_PATH, "a") as f:
             f.write(line + "\n")
     except Exception:

@@ -1,97 +1,130 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 560" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 580" width="100%" height="100%">
   <defs>
     <marker id="blue-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#0969da"/>
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#2563eb"/>
+    </marker>
+    <marker id="red-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#dc2626"/>
     </marker>
     <style>
-      .node-rect { fill: #ffffff; stroke: #24292f; stroke-width: 1.2; rx: 4px; }
-      .container-rect { fill: #f6f8fa; stroke: #24292f; stroke-width: 1.2; rx: 6px; }
-      .sub-rect { fill: #ffffff; stroke: #24292f; stroke-width: 1.1; rx: 4px; }
-      .label-rect { fill: #ffffff; stroke: #d0d7de; stroke-width: 1; rx: 4px; }
-      .node-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 12.5px; font-weight: 600; fill: #24292f; text-anchor: middle; dominant-baseline: central; }
-      .container-title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 12px; font-weight: 700; fill: #24292f; letter-spacing: 0.2px; }
-      .sub-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #24292f; text-anchor: middle; dominant-baseline: central; }
-      .tag-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 10px; font-weight: 600; fill: #57606a; text-anchor: middle; dominant-baseline: central; }
-      .flow-line { stroke: #0969da; stroke-width: 1.5; fill: none; }
+      .node-rect { fill: #ffffff; stroke: #334155; stroke-width: 1.4; rx: 6px; }
+      .container-rect { fill: #f8fafc; stroke: #cbd5e1; stroke-width: 1.4; rx: 8px; }
+      .sub-rect { fill: #ffffff; stroke: #64748b; stroke-width: 1.2; rx: 5px; }
+      .exec-rect { fill: #eff6ff; stroke: #2563eb; stroke-width: 1.6; rx: 6px; }
+      .patrol-rect { fill: #fff7ed; stroke: #ea580c; stroke-width: 1.4; rx: 6px; }
+      .trigger-rect { fill: #fef2f2; stroke: #f87171; stroke-width: 1.2; rx: 6px; }
+      .tag-pill { fill: #ffffff; stroke: #93c5fd; stroke-width: 1.1; rx: 4px; }
+      .alert-pill { fill: #ffffff; stroke: #fca5a5; stroke-width: 1.1; rx: 4px; }
+      
+      .node-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 12px; font-weight: 600; fill: #0f172a; text-anchor: middle; dominant-baseline: central; }
+      .container-title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 12px; font-weight: 700; fill: #1e293b; letter-spacing: 0.3px; }
+      .sub-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 10px; font-weight: 500; fill: #1e293b; text-anchor: middle; dominant-baseline: central; }
+      .exec-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 700; fill: #1d4ed8; text-anchor: middle; dominant-baseline: central; }
+      .patrol-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 12px; font-weight: 700; fill: #9a3412; text-anchor: middle; dominant-baseline: central; }
+      .trigger-title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 700; fill: #b91c1c; text-anchor: middle; dominant-baseline: central; }
+      .trigger-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 9.5px; font-weight: 500; fill: #7f1d1d; text-anchor: middle; dominant-baseline: central; }
+      .tag-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 9.5px; font-weight: 600; fill: #1d4ed8; text-anchor: middle; dominant-baseline: central; }
+      .alert-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 9.5px; font-weight: 600; fill: #b91c1c; text-anchor: middle; dominant-baseline: central; }
+      
+      .flow-line { stroke: #2563eb; stroke-width: 1.6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+      .alert-line { stroke: #dc2626; stroke-width: 1.6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
     </style>
   </defs>
 
   <!-- Background Card -->
-  <rect width="920" height="560" rx="12" fill="#ffffff" stroke="#e1e4e8" stroke-width="1"/>
+  <rect width="1000" height="580" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
 
-  <!-- Top Flow: Candidate Universe -> Rule Engine -> Screening Pool -->
+  <!-- Top Flow: Candidate Universe -> Rule Filters -> Screening Pool -->
   <!-- 1. Candidate Stock Universe -->
-  <rect class="node-rect" x="310" y="30" width="300" height="38"/>
-  <text class="node-text" x="460" y="49">Candidate Stock Universe (NASDAQ / NYSE)</text>
+  <rect class="node-rect" x="325" y="24" width="350" height="36"/>
+  <text class="node-text" x="500" y="42">Candidate Stock Universe (NASDAQ / NYSE)</text>
 
   <!-- Arrow 1 -> 2 -->
-  <line class="flow-line" x1="460" y1="68" x2="460" y2="98" marker-end="url(#blue-arrow)"/>
+  <line class="flow-line" x1="500" y1="60" x2="500" y2="84" marker-end="url(#blue-arrow)"/>
 
   <!-- 2. Module 1: Official Rule Filters & Multi-Factor Scoring -->
-  <rect class="node-rect" x="270" y="98" width="380" height="38"/>
-  <text class="node-text" x="460" y="117">Module 1: Official Rule Filters &amp; Multi-Factor Scoring</text>
+  <rect class="node-rect" x="280" y="84" width="440" height="36"/>
+  <text class="node-text" x="500" y="102">Module 1: Official Rule Filters &amp; Multi-Factor Scoring</text>
 
   <!-- Arrow 2 -> 3 -->
-  <line class="flow-line" x1="460" y1="136" x2="460" y2="166" marker-end="url(#blue-arrow)"/>
+  <line class="flow-line" x1="500" y1="120" x2="500" y2="144" marker-end="url(#blue-arrow)"/>
 
   <!-- 3. Screened Buy Candidate Pool -->
-  <rect class="node-rect" x="340" y="166" width="240" height="38"/>
-  <text class="node-text" x="460" y="185">Screened Buy Candidate Pool</text>
+  <rect class="node-rect" x="350" y="144" width="300" height="36"/>
+  <text class="node-text" x="500" y="162">Screened Buy Candidate Pool</text>
 
   <!-- Arrow 3 -> 4 Container -->
-  <line class="flow-line" x1="460" y1="204" x2="460" y2="234" marker-end="url(#blue-arrow)"/>
+  <line class="flow-line" x1="500" y1="180" x2="500" y2="204" marker-end="url(#blue-arrow)"/>
 
   <!-- 4. 4-Pillar Quantitative Synthesis Engine Container -->
-  <rect class="container-rect" x="45" y="234" width="830" height="84"/>
-  <text class="container-title" x="58" y="252">4-Pillar Quantitative Synthesis Engine</text>
-  <line x1="45" y1="260" x2="875" y2="260" stroke="#d0d7de" stroke-width="1"/>
+  <rect class="container-rect" x="35" y="204" width="930" height="84"/>
+  <text class="container-title" x="53" y="221">4-Pillar Quantitative Synthesis Engine</text>
+  <line x1="35" y1="229" x2="965" y2="229" stroke="#cbd5e1" stroke-width="1"/>
 
-  <!-- 4 Sub-Boxes -->
-  <rect class="sub-rect" x="58" y="268" width="205" height="38"/>
-  <text class="sub-text" x="160.5" y="287">Technical Indicators (EMA/RSI/MACD/ATR)</text>
+  <!-- 4 Sub-Boxes with Generous Widths -->
+  <rect class="sub-rect" x="50" y="238" width="246" height="36"/>
+  <text class="sub-text" x="173" y="256">Technical Indicators (EMA / RSI / MACD / ATR)</text>
 
-  <rect class="sub-rect" x="273" y="268" width="165" height="38"/>
-  <text class="sub-text" x="355.5" y="287">Multi-Stage DCF Valuation</text>
+  <rect class="sub-rect" x="308" y="238" width="180" height="36"/>
+  <text class="sub-text" x="398" y="256">Multi-Stage DCF Valuation</text>
 
-  <rect class="sub-rect" x="448" y="268" width="185" height="38"/>
-  <text class="sub-text" x="540.5" y="287">100k-Path Monte Carlo VaR</text>
+  <rect class="sub-rect" x="500" y="238" width="192" height="36"/>
+  <text class="sub-text" x="596" y="256">100k-Path Monte Carlo VaR</text>
 
-  <rect class="sub-rect" x="643" y="268" width="220" height="38"/>
-  <text class="sub-text" x="753" y="287">Kelly Sizing &amp; Correlation Matrix</text>
+  <rect class="sub-rect" x="704" y="238" width="246" height="36"/>
+  <text class="sub-text" x="827" y="256">Kelly Sizing &amp; Correlation Matrix</text>
 
-  <!-- Bottom Flow -->
+  <!-- Bottom Section: Split Columns -->
+  <!-- Left Column: Trade Execution Pipeline (x = 100..480, center = 290) -->
   <!-- Arrow Container -> Module 3 -->
-  <line class="flow-line" x1="460" y1="318" x2="460" y2="350" marker-end="url(#blue-arrow)"/>
+  <line class="flow-line" x1="290" y1="288" x2="290" y2="320" marker-end="url(#blue-arrow)"/>
 
-  <!-- Module 3 -->
-  <rect class="node-rect" x="285" y="350" width="350" height="38"/>
-  <text class="node-text" x="460" y="369">Module 3: Drawdown State Machine &amp; Position Sizing</text>
+  <!-- Module 3: Drawdown State Machine & Position Sizing -->
+  <rect class="node-rect" x="100" y="320" width="380" height="40"/>
+  <text class="node-text" x="290" y="340">Module 3: Drawdown State Machine &amp; Position Sizing</text>
 
   <!-- Arrow Module 3 -> Module 4 -->
-  <line class="flow-line" x1="460" y1="388" x2="460" y2="420" marker-end="url(#blue-arrow)"/>
+  <line class="flow-line" x1="290" y1="360" x2="290" y2="390" marker-end="url(#blue-arrow)"/>
 
-  <!-- Module 4 -->
-  <rect class="node-rect" x="275" y="420" width="370" height="38"/>
-  <text class="node-text" x="460" y="439">Module 4: 9-State Order Machine &amp; Pre-Trade Risk Gates</text>
+  <!-- Module 4: 9-State Order Machine & Pre-Trade Risk Gates -->
+  <rect class="node-rect" x="100" y="390" width="380" height="40"/>
+  <text class="node-text" x="290" y="410">Module 4: 9-State Order Machine &amp; Pre-Trade Risk Gates</text>
 
-  <!-- Module 5 (Real-Time Risk Patrol Daemon) -->
-  <rect class="node-rect" x="640" y="350" width="260" height="38"/>
-  <text class="node-text" x="770" y="369">Module 5: 0.5s Real-Time Risk Patrol Daemon</text>
+  <!-- Arrow Module 4 -> Final Trade Execution -->
+  <line class="flow-line" x1="290" y1="430" x2="290" y2="460" marker-end="url(#blue-arrow)"/>
 
   <!-- Final Trade Execution -->
-  <rect class="node-rect" x="680" y="488" width="180" height="38"/>
-  <text class="node-text" x="770" y="507">Final Trade Execution</text>
+  <rect class="exec-rect" x="165" y="460" width="250" height="44"/>
+  <text class="exec-text" x="290" y="482">Final Trade Execution</text>
 
-  <!-- Arrow: Module 4 -> Final Trade Execution -->
-  <path class="flow-line" d="M 645 439 L 740 439 L 740 488" marker-end="url(#blue-arrow)"/>
+  <!-- Right Column: Autonomous Real-Time Risk Patrol (x = 630..950, center = 790) -->
+  <!-- Module 5: 0.5s Real-Time Risk Patrol Daemon -->
+  <rect class="patrol-rect" x="630" y="320" width="320" height="40"/>
+  <text class="patrol-text" x="790" y="340">Module 5: 0.5s Real-Time Risk Patrol Daemon</text>
 
-  <!-- Arrow: Module 5 -> Final Trade Execution (Trigger liquidation/trim) -->
-  <line class="flow-line" x1="765" y1="388" x2="765" y2="488" marker-end="url(#blue-arrow)"/>
+  <!-- Arrow: Module 5 -> Triggers -->
+  <line class="alert-line" x1="790" y1="360" x2="790" y2="390" marker-end="url(#red-arrow)"/>
 
-  <!-- Trigger Condition Floating Tag -->
-  <rect class="label-rect" x="620" y="426" width="280" height="26"/>
-  <text class="tag-text" x="760" y="439">Triggers: GAES -6% / 5% Trailing Stop / Cap Exceeded</text>
+  <!-- Autonomous Risk Patrol Triggers Card -->
+  <rect class="trigger-rect" x="630" y="390" width="320" height="50"/>
+  <text class="trigger-title" x="790" y="407">Autonomous Risk Patrol Triggers</text>
+  <text class="trigger-body" x="790" y="425">GAES -6.0% Hard Floor  •  5.0% Trailing Stop  •  20% Cap Trim</text>
 
-  <!-- Arrow: Final Trade Execution -> Module 5 (Continuous upward surveillance loop) -->
-  <line class="flow-line" x1="800" y1="488" x2="800" y2="394" marker-end="url(#blue-arrow)"/>
+  <!-- Feedback Loop 1: Portfolio Surveillance (Final Trade Execution -> Module 5) -->
+  <!-- Segment 1: from Execution right edge to pill bottom -->
+  <path class="flow-line" d="M 415 482 L 555 482 L 555 422"/>
+  <!-- Pill Badge -->
+  <rect class="tag-pill" x="500" y="402" width="110" height="20"/>
+  <text class="tag-text" x="555" y="412">0.5s Portfolio Poll</text>
+  <!-- Segment 2: from pill top into Module 5 left edge -->
+  <path class="flow-line" d="M 555 402 L 555 340 L 630 340" marker-end="url(#blue-arrow)"/>
+
+  <!-- Control Loop 2: Emergency Risk Execution (Triggers -> Final Trade Execution) -->
+  <!-- Segment 1: from Triggers bottom to pill right edge -->
+  <path class="alert-line" d="M 790 440 L 790 536 L 685 536"/>
+  <!-- Pill Badge -->
+  <rect class="alert-pill" x="475" y="526" width="210" height="20"/>
+  <text class="alert-text" x="580" y="536">Immediate Emergency Liquidation / Trim</text>
+  <!-- Segment 2: from pill left edge to Execution bottom edge -->
+  <path class="alert-line" d="M 475 536 L 290 536 L 290 504" marker-end="url(#red-arrow)"/>
 </svg>
