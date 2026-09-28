@@ -188,6 +188,19 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
+For a first run without downloading market data, use the installed command
+with the sanitized example snapshot:
+
+```bash
+smg-cli --help
+smg-cli config/example_snapshot.json --output demo_report.md
+```
+
+Open `demo_report.md` to inspect the review packet. Historical backtests use
+market data from `yfinance` and therefore need network access. The Monte Carlo
+Python API accepts a `seed` for repeatable simulations; the CLI does not have
+a `--seed` option.
+
 ### 2. Run Comprehensive Unit Test Suite
 ```bash
 python3 -m unittest discover -s tests -v
